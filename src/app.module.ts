@@ -18,6 +18,7 @@ import { ReportsModule } from './reports/reports.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { AiModule } from './ai/ai.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { InvoicesModule } from './invoices/invoices.module';
     AccountingModule,
     AiModule,
     InvoicesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
