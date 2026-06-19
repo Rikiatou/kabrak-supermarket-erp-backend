@@ -193,6 +193,7 @@ model CashRegister {
   
   transactions Transaction[]
   shifts       Shift[]
+  schedules    Schedule[]
   
   @@index([code])
   @@index([status])
@@ -254,6 +255,7 @@ model Employee {
   
   transactions  Transaction[]
   shifts        Shift[]
+  schedules     Schedule[]
   
   @@index([employeeNumber])
   @@index([role])
@@ -549,4 +551,42 @@ model InvoicePayment {
   @@index([date])
   
   @@map("invoice_payments")
+}
+
+// ========================================
+// PLANNING HEBDOMADAIRE DES CAISSES
+// ========================================
+model Schedule {
+  id          String   @id @default(cuid())
+  
+  employeeId  String
+  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  registerId  String
+  register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  
+  // Jour de la semaine: 0=dimanche, 1=lundi, ..., 6=samedi
+  dayOfWeek   Int
+  
+  // Créneau horaire
+  startTime   String   // "08:00"
+  endTime     String   // "17:00"
+  
+  // Pause (optionnel)
+  breakStart  String?  // "12:00"
+  breakEnd    String?  // "13:00"
+  
+  isActive    Boolean  @default(true)
+  
+  notes       String?  // "Remplacement", "Heures supplémentaires", etc.
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([employeeId, dayOfWeek, startTime]) // Un employé ne peut pas être 2x au même créneau
+  @@index([employeeId])
+  @@index([registerId])
+  @@index([dayOfWeek])
+  
+  @@map("schedules")
 }
