@@ -109,7 +109,37 @@ async function main() {
     },
   });
 
-  console.log(`✅ 3 employés créés`);
+  const omarou = await prisma.employee.create({
+    data: {
+      employeeNumber: 'EMP004',
+      firstName: 'Omarou',
+      lastName: 'Bouba',
+      role: 'stockist',
+      department: 'Magasin',
+      phone: '+237 6 55 67 89 01',
+      email: 'o.bouba@kabrak.cm',
+      hireDate: new Date('2023-06-01'),
+      status: 'active',
+      pin: '4567',
+    },
+  });
+
+  const sophie = await prisma.employee.create({
+    data: {
+      employeeNumber: 'EMP005',
+      firstName: 'Sophie',
+      lastName: 'Kameni',
+      role: 'supervisor',
+      department: 'Supervision',
+      phone: '+237 6 90 12 34 56',
+      email: 's.kameni@kabrak.cm',
+      hireDate: new Date('2022-01-15'),
+      status: 'active',
+      pin: '5678',
+    },
+  });
+
+  console.log(`✅ 5 employés créés (manager, 2 caissiers, stockist, supervisor)`);
 
   // ========================================
   // CAISSES
@@ -144,7 +174,17 @@ async function main() {
     },
   });
 
-  console.log(`✅ 3 caisses créées`);
+  const caisse4 = await prisma.cashRegister.create({
+    data: {
+      name: 'Caisse 4',
+      code: 'REG004',
+      status: 'closed',
+      openingCash: 50000,
+      location: 'Sortie',
+    },
+  });
+
+  console.log(`✅ 4 caisses créées`);
 
   // ========================================
   // PRODUITS
@@ -267,7 +307,213 @@ async function main() {
     await prisma.product.create({ data: product });
   }
 
-  console.log(`✅ ${products.length} produits créés`);
+  // Produit avec markdown (yaourt qui expire bientôt)
+  const yaourtMarkdown = await prisma.product.create({
+    data: {
+      sku: 'YN-500-012-MD',
+      barcode: '0630011223355',
+      name: 'Yaourt Nature Candia 500g (PROMO)',
+      category: 'Produits laitiers',
+      subCategory: 'Yaourts',
+      brand: 'Candia',
+      price: 1200,
+      costPrice: 900,
+      markdownPrice: 500,
+      markdownReason: 'expiry',
+      markdownNote: 'Expire bientôt — destockage',
+      markdownStartsAt: new Date(),
+      markdownExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      stock: 15,
+      minStock: 20,
+      unit: 'pot',
+      expiryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // expire dans 5 jours
+      supplierId: sabc.id,
+    },
+  });
+
+  // Produit expiré (pour tester les notifications)
+  await prisma.product.create({
+    data: {
+      sku: 'LAIT-1L-EXP',
+      barcode: '0690011226677',
+      name: 'Lait Frais 1L (Expiré)',
+      category: 'Produits laitiers',
+      subCategory: 'Laits',
+      brand: 'Candia',
+      price: 800,
+      costPrice: 550,
+      stock: 8,
+      minStock: 20,
+      unit: 'bouteille',
+      expiryDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // expiré depuis 2 jours
+      supplierId: sabc.id,
+    },
+  });
+
+  console.log(`✅ ${products.length + 2} produits créés (dont 1 en markdown, 1 expiré)`);
+
+  // ========================================
+  // PLANNING DES CAISSES
+  // ========================================
+  const caisse1 = await prisma.cashRegister.findFirst({ where: { code: 'REG001' } });
+  const caisse2 = await prisma.cashRegister.findFirst({ where: { code: 'REG002' } });
+
+  if (caisse1 && caisse2) {
+    // Jean-Paul: Caisse 1, lundi à vendredi, 8h-17h
+    for (let day = 1; day <= 5; day++) {
+      await prisma.schedule.create({
+        data: {
+          employeeId: jeanPaul.id,
+          registerId: caisse1.id,
+          dayOfWeek: day,
+          startTime: '08:00',
+          endTime: '17:00',
+          breakStart: '12:00',
+          breakEnd: '13:00',
+        },
+      });
+    }
+    // Fatou: Caisse 2, lundi à samedi, 9h-18h
+    for (let day = 1; day <= 6; day++) {
+      await prisma.schedule.create({
+        data: {
+          employeeId: fatou.id,
+          registerId: caisse2.id,
+          dayOfWeek: day,
+          startTime: '09:00',
+          endTime: '18:00',
+          breakStart: '13:00',
+          breakEnd: '14:00',
+        },
+      });
+    }
+    // Sophie: Caisse 3, mardi et jeudi (supervision)
+    for (const day of [2, 4]) {
+      await prisma.schedule.create({
+        data: {
+          employeeId: sophie.id,
+          registerId: caisse4.id,
+          dayOfWeek: day,
+          startTime: '10:00',
+          endTime: '16:00',
+          notes: 'Supervision',
+        },
+      });
+    }
+  }
+
+  console.log(`✅ Plannings créés (Jean-Paul Caisse 1, Fatou Caisse 2, Sophie Caisse 4)`);
+
+  // ========================================
+  // TRANSACTIONS (ventes du jour)
+  // ========================================
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const allProducts = await prisma.product.findMany();
+  const sampleTransactions = [
+    { items: [{ idx: 1, qty: 2 }, { idx: 4, qty: 5 }], method: 'cash', cashier: jeanPaul.id },
+    { items: [{ idx: 5, qty: 3 }, { idx: 0, qty: 1 }], method: 'mobile', cashier: fatou.id },
+    { items: [{ idx: 2, qty: 4 }, { idx: 3, qty: 1 }], method: 'cash', cashier: jeanPaul.id },
+    { items: [{ idx: 1, qty: 10 }, { idx: 4, qty: 2 }], method: 'card', cashier: fatou.id },
+    { items: [{ idx: 6, qty: 2 }], method: 'cash', cashier: jeanPaul.id },
+  ];
+
+  for (let i = 0; i < sampleTransactions.length; i++) {
+    const t = sampleTransactions[i];
+    let total = 0;
+    const items: any[] = [];
+    for (const item of t.items) {
+      const p = allProducts[item.idx];
+      if (!p) continue;
+      const itemTotal = p.price * item.qty;
+      total += itemTotal;
+      items.push({
+        productId: p.id,
+        quantity: item.qty,
+        unitPrice: p.price,
+        discount: 0,
+        tax: Math.round(itemTotal * 0.155),
+        total: Math.round(itemTotal * 1.155),
+      });
+    }
+    const tax = Math.round(total * 0.155);
+    const txnDate = new Date(todayStart.getTime() + i * 3600000);
+    const dateStr = txnDate.toISOString().slice(0, 10).replace(/-/g, '');
+    await prisma.transaction.create({
+      data: {
+        transactionNumber: `TXN-${dateStr}-${String(i + 1).padStart(4, '0')}`,
+        cashierId: t.cashier,
+        registerId: caisse1?.id || caisse2?.id || '',
+        items: { create: items },
+        subtotal: total,
+        tax,
+        discount: 0,
+        total: total + tax,
+        paymentMethod: t.method,
+        cashGiven: total + tax,
+        change: 0,
+        status: 'completed',
+        date: txnDate, // chaque heure
+      },
+    });
+  }
+
+  console.log(`✅ ${sampleTransactions.length} transactions créées`);
+
+  // ========================================
+  // FACTURE
+  // ========================================
+  await prisma.invoice.create({
+    data: {
+      number: 'INV-2026-001',
+      clientName: 'Hôtel Mont Fébé',
+      clientPhone: '+237 2 22 20 00 00',
+      clientEmail: 'achat@montfebe.cm',
+      clientAddress: 'Bastos, Yaoundé',
+      date: new Date(),
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      subtotal: 250000,
+      tax: 38750,
+      total: 288750,
+      paidAmount: 100000,
+      status: 'partial',
+      items: {
+        create: [
+          { description: 'Riz Parfumé 25kg', quantity: 10, unitPrice: 22000, total: 220000 },
+          { description: 'Huile Végétale 5L', quantity: 5, unitPrice: 5500, total: 27500 },
+        ],
+      },
+      payments: {
+        create: [
+          { amount: 100000, method: 'transfer', note: 'Acompte', date: new Date() },
+        ],
+      },
+    },
+  });
+
+  // Facture en retard (overdue)
+  await prisma.invoice.create({
+    data: {
+      number: 'INV-2026-002',
+      clientName: 'Restaurant Le Wouri',
+      clientPhone: '+237 6 99 88 77 66',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+      dueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // échéance passée
+      subtotal: 150000,
+      tax: 23250,
+      total: 173250,
+      paidAmount: 0,
+      status: 'overdue',
+      items: {
+        create: [
+          { description: 'Bière 33 Export 65cl (carton 24)', quantity: 20, unitPrice: 7500, total: 150000 },
+        ],
+      },
+    },
+  });
+
+  console.log(`✅ 2 factures créées (1 partielle, 1 en retard)`);
 
   // ========================================
   // CLIENT FIDÉLITÉ
@@ -292,6 +538,8 @@ async function main() {
   console.log('   Manager: EMP001 / PIN: 1234');
   console.log('   Caissier: EMP002 / PIN: 2345');
   console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
 }
 
 main()

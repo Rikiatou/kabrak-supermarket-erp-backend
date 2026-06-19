@@ -36,6 +36,16 @@ export class TransactionsController {
     return this.transactionsService.getTodayStats();
   }
 
+  @Get('stats/yesterday')
+  getYesterdayStats() {
+    return this.transactionsService.getYesterdayStats();
+  }
+
+  @Get('stats/week-trend')
+  getWeekTrend() {
+    return this.transactionsService.getWeekTrend();
+  }
+
   @Get('stats/by-register')
   getSalesByRegister() {
     return this.transactionsService.getSalesByRegister();

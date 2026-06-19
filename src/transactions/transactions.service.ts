@@ -234,6 +234,82 @@ export class TransactionsService {
     };
   }
 
+  // Stats d'hier (pour comparaison dashboard)
+  async getYesterdayStats() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [transactions, totalRevenue, totalItems] = await Promise.all([
+      this.prisma.transaction.count({
+        where: {
+          date: { gte: yesterday, lt: todayStart },
+          status: 'completed',
+        },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          date: { gte: yesterday, lt: todayStart },
+          status: 'completed',
+        },
+        _sum: { total: true },
+      }),
+      this.prisma.transactionItem.aggregate({
+        where: {
+          transaction: {
+            date: { gte: yesterday, lt: todayStart },
+            status: 'completed',
+          },
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    const avgBasket = transactions > 0 ? (totalRevenue._sum.total || 0) / transactions : 0;
+
+    return {
+      transactions,
+      revenue: totalRevenue._sum.total || 0,
+      itemsSold: totalItems._sum.quantity || 0,
+      avgBasket: Math.round(avgBasket),
+    };
+  }
+
+  // Ventes des 7 derniers jours (pour graphique de tendance)
+  async getWeekTrend() {
+    const days: Array<{ date: string; label: string; revenue: number; transactions: number }> = [];
+    const dayLabels = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+    for (let i = 6; i >= 0; i--) {
+      const start = new Date();
+      start.setDate(start.getDate() - i);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+
+      const [count, revenue] = await Promise.all([
+        this.prisma.transaction.count({
+          where: { date: { gte: start, lt: end }, status: 'completed' },
+        }),
+        this.prisma.transaction.aggregate({
+          where: { date: { gte: start, lt: end }, status: 'completed' },
+          _sum: { total: true },
+        }),
+      ]);
+
+      days.push({
+        date: start.toISOString().slice(0, 10),
+        label: dayLabels[start.getDay()],
+        revenue: revenue._sum.total || 0,
+        transactions: count,
+      });
+    }
+
+    return days;
+  }
+
   // Ventes par caisse
   async getSalesByRegister() {
     const today = new Date();
