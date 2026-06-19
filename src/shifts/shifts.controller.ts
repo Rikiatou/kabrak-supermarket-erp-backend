@@ -1,0 +1,37 @@
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { ShiftsService } from './shifts.service';
+import { OpenShiftDto } from './dto/open-shift.dto';
+import { CloseShiftDto } from './dto/close-shift.dto';
+
+@Controller('shifts')
+export class ShiftsController {
+  constructor(private readonly shiftsService: ShiftsService) {}
+
+  @Get()
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.shiftsService.findAll(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+  }
+
+  @Get('active')
+  findActive() {
+    return this.shiftsService.findActive();
+  }
+
+  @Get('employee/:employeeId')
+  findByEmployee(@Param('employeeId') employeeId: string) {
+    return this.shiftsService.findByEmployee(employeeId);
+  }
+
+  @Post('open')
+  openShift(@Body() dto: OpenShiftDto) {
+    return this.shiftsService.openShift(dto);
+  }
+
+  @Post(':id/close')
+  closeShift(@Param('id') id: string, @Body() dto: CloseShiftDto) {
+    return this.shiftsService.closeShift(id, dto);
+  }
+}
