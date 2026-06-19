@@ -190,6 +190,37 @@ export class InvoicesService {
     };
   }
 
+  async getUnpaidStats() {
+    const [partial, overdue] = await Promise.all([
+      this.prisma.invoice.aggregate({
+        where: { status: 'partial' },
+        _sum: { balance: true },
+        _count: true,
+      }),
+      this.prisma.invoice.aggregate({
+        where: { status: 'overdue' },
+        _sum: { balance: true },
+        _count: true,
+      }),
+    ]);
+
+    const totalUnpaid = (partial._sum.balance || 0) + (overdue._sum.balance || 0);
+    const count = (partial._count || 0) + (overdue._count || 0);
+
+    return {
+      totalUnpaid,
+      count,
+      partial: {
+        amount: partial._sum.balance || 0,
+        count: partial._count || 0,
+      },
+      overdue: {
+        amount: overdue._sum.balance || 0,
+        count: overdue._count || 0,
+      },
+    };
+  }
+
   async remove(id: string) {
     // Supprimer d'abord les versements, puis les items, puis la facture
     await this.prisma.invoicePayment.deleteMany({ where: { invoiceId: id } });

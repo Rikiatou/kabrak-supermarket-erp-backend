@@ -25,6 +25,11 @@ export class InvoicesController {
     return this.invoicesService.getStats();
   }
 
+  @Get('stats/unpaid')
+  getUnpaidStats() {
+    return this.invoicesService.getUnpaidStats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.invoicesService.findOne(id);
