@@ -27,22 +27,29 @@ model Product {
   price       Int      // Prix vente
   costPrice   Int      // Prix achat
   taxRate     Float    @default(15.5) // TVA 15.5%
-  
+
+  // Markdown / Promotion (destockage, péremption, promo)
+  markdownPrice    Int?      // Prix réduit (si null, pas de markdown)
+  markdownReason   String?   // "expiry", "near_expiry", "clearance", "promo"
+  markdownNote     String?   // Note libre du manager
+  markdownStartsAt DateTime? // Début du markdown
+  markdownExpiresAt DateTime? // Fin du markdown (auto-restauration du prix)
+
   // Stock
   stock       Int      @default(0)
   minStock    Int      @default(10)
   maxStock    Int?
   unit        String   // "pièce", "kg", "litre", "carton"
-  
+
   // Dates
   expiryDate  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   // Relations
   supplierId  String?
   supplier    Supplier? @relation(fields: [supplierId], references: [id])
-  
+
   // Métadonnées
   imageUrl    String?
   isActive    Boolean  @default(true)
@@ -62,6 +69,7 @@ model Product {
   @@index([stock, minStock])            // Alertes stock faible
   @@index([isActive])                   // Produits actifs seulement
   @@index([supplierId])                 // Produits par fournisseur
+  @@index([markdownPrice])              // Produits en markdown actif
   
   @@map("products")
 }

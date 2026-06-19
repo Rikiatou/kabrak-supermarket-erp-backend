@@ -19,4 +19,9 @@ export class AiController {
   getSalesInsights() {
     return this.aiService.getSalesInsights();
   }
+
+  @Get('markdown-suggestions')
+  getMarkdownSuggestions() {
+    return this.aiService.getMarkdownSuggestions();
+  }
 }

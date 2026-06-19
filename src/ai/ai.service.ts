@@ -212,4 +212,152 @@ export class AiService {
       topProducts: topProducts.slice(0, 5),
     };
   }
+
+  // Suggestions de markdown (destockage, péremption, surstock)
+  async getMarkdownSuggestions() {
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Produits candidats: stock > 0, pas déjà en markdown, avec expiryDate dans les 60 prochains jours OU surstock
+    const candidates = await this.prisma.product.findMany({
+      where: {
+        isActive: true,
+        stock: { gt: 0 },
+        markdownPrice: null,
+        OR: [
+          // Produits expirant dans les 60 prochains jours
+          {
+            expiryDate: {
+              lte: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+              gte: now,
+            },
+          },
+          // Produits déjà expirés (urgence maximale)
+          { expiryDate: { lt: now } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        category: true,
+        stock: true,
+        price: true,
+        costPrice: true,
+        unit: true,
+        expiryDate: true,
+      },
+    });
+
+    // Récupérer la vélocité de vente des 30 derniers jours
+    const salesData = await this.prisma.transactionItem.groupBy({
+      by: ['productId'],
+      where: {
+        transaction: {
+          date: { gte: thirtyDaysAgo },
+          status: 'completed',
+        },
+      },
+      _sum: { quantity: true },
+    });
+
+    const salesMap = new Map<string, number>();
+    salesData.forEach((s) => salesMap.set(s.productId, s._sum.quantity || 0));
+
+    const suggestions = candidates.map((product) => {
+      const sold30Days = salesMap.get(product.id) || 0;
+      const dailyVelocity = sold30Days / 30;
+      const daysToExpiry = product.expiryDate
+        ? Math.ceil((new Date(product.expiryDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      // Déterminer la raison et le pourcentage de markdown
+      let reason: 'expiry' | 'near_expiry' | 'clearance' = 'near_expiry';
+      let markdownPercent = 0;
+      let priority: 'critical' | 'high' | 'medium' = 'medium';
+
+      if (daysToExpiry !== null) {
+        if (daysToExpiry <= 0) {
+          // Déjà expiré — markdown agressif
+          reason = 'expiry';
+          markdownPercent = 80;
+          priority = 'critical';
+        } else if (daysToExpiry <= 3) {
+          reason = 'expiry';
+          markdownPercent = 60;
+          priority = 'critical';
+        } else if (daysToExpiry <= 7) {
+          reason = 'expiry';
+          markdownPercent = 40;
+          priority = 'high';
+        } else if (daysToExpiry <= 15) {
+          reason = 'near_expiry';
+          markdownPercent = 25;
+          priority = 'high';
+        } else if (daysToExpiry <= 30) {
+          reason = 'near_expiry';
+          markdownPercent = 15;
+          priority = 'medium';
+        } else {
+          // 30-60 jours: promo légère si surstock
+          const daysUntilOut = dailyVelocity > 0 ? product.stock / dailyVelocity : 999;
+          if (daysUntilOut > daysToExpiry) {
+            // Plus de stock que ce qu'on peut vendre avant expiration
+            reason = 'clearance';
+            markdownPercent = 10;
+            priority = 'medium';
+          } else {
+            return null; // Pas besoin de markdown
+          }
+        }
+      }
+
+      // Ajuster le markdown si la vélocité est très basse (ne se vend pas)
+      if (dailyVelocity < 0.5 && daysToExpiry !== null && daysToExpiry <= 30) {
+        markdownPercent = Math.min(markdownPercent + 15, 90);
+      }
+
+      const markdownPrice = Math.round(product.price * (1 - markdownPercent / 100));
+      const potentialLoss = (product.price - markdownPrice) * product.stock;
+
+      return {
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        category: product.category,
+        stock: product.stock,
+        price: product.price,
+        costPrice: product.costPrice,
+        unit: product.unit,
+        expiryDate: product.expiryDate,
+        daysToExpiry,
+        sold30Days,
+        dailyVelocity: Math.round(dailyVelocity * 10) / 10,
+        reason,
+        markdownPercent,
+        suggestedMarkdownPrice: markdownPrice,
+        potentialLoss,
+        priority,
+      };
+    }).filter((s): s is NonNullable<typeof s> => s !== null);
+
+    // Trier par priorité puis par jours avant expiration
+    const priorityOrder = { critical: 0, high: 1, medium: 2 };
+    suggestions.sort((a, b) => {
+      const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (pDiff !== 0) return pDiff;
+      return (a.daysToExpiry ?? 999) - (b.daysToExpiry ?? 999);
+    });
+
+    const summary = {
+      total: suggestions.length,
+      critical: suggestions.filter((s) => s.priority === 'critical').length,
+      high: suggestions.filter((s) => s.priority === 'high').length,
+      medium: suggestions.filter((s) => s.priority === 'medium').length,
+      totalPotentialLoss: suggestions.reduce((sum, s) => sum + s.potentialLoss, 0),
+    };
+
+    return { summary, suggestions: suggestions.slice(0, 30) };
+  }
 }

@@ -12,6 +12,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { SearchProductDto } from './dto/search-product.dto';
+import { SetMarkdownDto } from './dto/set-markdown.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -45,6 +46,19 @@ export class ProductsController {
     return this.productsService.getStockAlerts();
   }
 
+  @Get('markdowns')
+  getMarkdowns(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.productsService.getMarkdowns(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 50,
+    );
+  }
+
+  @Post('markdowns/cleanup')
+  cleanupExpiredMarkdowns() {
+    return this.productsService.cleanupExpiredMarkdowns();
+  }
+
   @Get('barcode/:barcode')
   findByBarcode(@Param('barcode') barcode: string) {
     return this.productsService.findByBarcode(barcode);
@@ -58,6 +72,16 @@ export class ProductsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productsService.update(id, updateProductDto);
+  }
+
+  @Patch(':id/markdown')
+  setMarkdown(@Param('id') id: string, @Body() dto: SetMarkdownDto) {
+    return this.productsService.setMarkdown(id, dto);
+  }
+
+  @Delete(':id/markdown')
+  removeMarkdown(@Param('id') id: string) {
+    return this.productsService.removeMarkdown(id);
   }
 
   @Delete(':id')

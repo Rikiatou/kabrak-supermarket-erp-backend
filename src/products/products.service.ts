@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { SearchProductDto } from './dto/search-product.dto';
+import { SetMarkdownDto } from './dto/set-markdown.dto';
 
 @Injectable()
 export class ProductsService {
@@ -254,6 +255,145 @@ export class ProductsService {
       expiring,
       outOfStock,
       healthy: total - lowStock - expiring - outOfStock,
+    };
+  }
+
+  // ========================================
+  // MARKDOWN / PROMOTIONS
+  // ========================================
+
+  // Appliquer un markdown sur un produit
+  async setMarkdown(id: string, dto: SetMarkdownDto) {
+    const product = await this.findOne(id);
+
+    // Validation: le prix markdown doit être inférieur au prix normal
+    if (dto.markdownPrice >= product.price) {
+      throw new BadRequestException(
+        `Le prix markdown (${dto.markdownPrice}) doit être inférieur au prix normal (${product.price})`,
+      );
+    }
+
+    // Validation: ne pas vendre à perte sauf si raison = expiry/clearance
+    if (dto.markdownPrice < product.costPrice && !['expiry', 'clearance'].includes(dto.markdownReason)) {
+      throw new BadRequestException(
+        `Vente à perte (${dto.markdownPrice} < coût ${product.costPrice}) autorisée uniquement pour expiry/clearance`,
+      );
+    }
+
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        markdownPrice: dto.markdownPrice,
+        markdownReason: dto.markdownReason,
+        markdownNote: dto.markdownNote || null,
+        markdownStartsAt: new Date(),
+        markdownExpiresAt: dto.markdownExpiresAt ? new Date(dto.markdownExpiresAt) : null,
+      },
+      include: { supplier: true },
+    });
+  }
+
+  // Retirer le markdown (restaurer le prix normal)
+  async removeMarkdown(id: string) {
+    await this.findOne(id);
+
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        markdownPrice: null,
+        markdownReason: null,
+        markdownNote: null,
+        markdownStartsAt: null,
+        markdownExpiresAt: null,
+      },
+      include: { supplier: true },
+    });
+  }
+
+  // Lister tous les produits en markdown actif
+  async getMarkdowns(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit;
+    const now = new Date();
+
+    const where = {
+      isActive: true,
+      markdownPrice: { not: null },
+      // Exclure les markdowns expirés (si markdownExpiresAt est dans le passé)
+      OR: [
+        { markdownExpiresAt: null },
+        { markdownExpiresAt: { gt: now } },
+      ],
+    };
+
+    const [products, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { supplier: true },
+        orderBy: { markdownStartsAt: 'desc' },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    // Calculer la valeur perdue (différence prix normal - prix markdown) × stock
+    const totalPotentialLoss = products.reduce(
+      (sum, p) => sum + (p.price - (p.markdownPrice || p.price)) * p.stock,
+      0,
+    );
+
+    return {
+      data: products,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      summary: {
+        count: total,
+        totalPotentialLoss,
+      },
+    };
+  }
+
+  // Nettoyer les markdowns expirés (cron job — restaure le prix normal)
+  async cleanupExpiredMarkdowns() {
+    const now = new Date();
+
+    const expired = await this.prisma.product.findMany({
+      where: {
+        markdownPrice: { not: null },
+        markdownExpiresAt: { lt: now },
+      },
+      select: { id: true, name: true, markdownPrice: true, price: true },
+    });
+
+    if (expired.length === 0) {
+      return { cleaned: 0, products: [] };
+    }
+
+    await this.prisma.product.updateMany({
+      where: {
+        id: { in: expired.map((p) => p.id) },
+      },
+      data: {
+        markdownPrice: null,
+        markdownReason: null,
+        markdownNote: null,
+        markdownStartsAt: null,
+        markdownExpiresAt: null,
+      },
+    });
+
+    return {
+      cleaned: expired.length,
+      products: expired.map((p) => ({
+        id: p.id,
+        name: p.name,
+        restoredPrice: p.price,
+        wasMarkdownPrice: p.markdownPrice,
+      })),
     };
   }
 }
