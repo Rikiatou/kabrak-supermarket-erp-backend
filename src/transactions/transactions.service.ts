@@ -79,7 +79,8 @@ export class TransactionsService {
             type: 'out',
             quantity: -item.quantity,
             reason: 'sale',
-            reference: tx.id,
+            reference: tx.transactionNumber,
+            notes: item.discount > 0 ? `Remise article: ${item.discount}` : undefined,
             syncStatus: 'pending',
           },
         });

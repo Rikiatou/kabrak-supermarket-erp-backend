@@ -29,6 +29,11 @@ export class PurchaseOrdersController {
     return this.purchaseOrdersService.create(dto);
   }
 
+  @Post('direct')
+  createDirect(@Body() dto: CreatePurchaseOrderDto & { invoiceNumber?: string }) {
+    return this.purchaseOrdersService.createAndReceive(dto, dto.invoiceNumber);
+  }
+
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.purchaseOrdersService.updateStatus(id, status);

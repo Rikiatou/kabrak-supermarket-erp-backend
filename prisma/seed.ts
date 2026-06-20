@@ -69,7 +69,7 @@ async function main() {
       employeeNumber: 'EMP001',
       firstName: 'Amina',
       lastName: 'Bello',
-      role: 'manager',
+      role: 'boss',
       department: 'Direction',
       phone: '+237 6 91 23 45 67',
       email: 'a.bello@kabrak.cm',
@@ -129,8 +129,8 @@ async function main() {
       employeeNumber: 'EMP005',
       firstName: 'Sophie',
       lastName: 'Kameni',
-      role: 'supervisor',
-      department: 'Supervision',
+      role: 'accountant',
+      department: 'Comptabilité',
       phone: '+237 6 90 12 34 56',
       email: 's.kameni@kabrak.cm',
       hireDate: new Date('2022-01-15'),
@@ -139,7 +139,7 @@ async function main() {
     },
   });
 
-  console.log(`✅ 5 employés créés (manager, 2 caissiers, stockist, supervisor)`);
+  console.log(`✅ 5 employés créés (boss, 2 caissiers, stocker, accountant)`);
 
   // ========================================
   // CAISSES
