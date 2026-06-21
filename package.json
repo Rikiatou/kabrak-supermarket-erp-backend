@@ -6,7 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "tsc",
+    "build": "prisma generate && tsc",
+    "postinstall": "prisma generate",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "node dist/main",
     "start:dev": "ts-node src/main.ts",
@@ -22,7 +23,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:db-push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "deploy:setup": "prisma db push && ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",

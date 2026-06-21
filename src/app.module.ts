@@ -26,10 +26,10 @@ import { LicensesModule } from './licenses/licenses.module';
 
 @Module({
   imports: [
-    // Configuration
+    // Configuration — charge .env.local en dev, variables d'env en production
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.local',
+      envFilePath: process.env.NODE_ENV === 'production' ? '.env' : '.env.local',
     }),
 
     // Modules
