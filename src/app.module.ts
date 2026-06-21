@@ -22,6 +22,7 @@ import { AiModule } from './ai/ai.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CronModule } from './cron/cron.module';
+import { LicensesModule } from './licenses/licenses.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CronModule } from './cron/cron.module';
     // Modules
     DatabaseModule,
     AuthModule,
+    LicensesModule,
     ProductsModule,
     TransactionsModule,
     StockModule,

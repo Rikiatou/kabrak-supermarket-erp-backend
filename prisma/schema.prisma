@@ -188,6 +188,10 @@ model CashRegister {
   location    String?  // "Entrée principale", "Sortie"
   isActive    Boolean  @default(true)
   
+  // Multi-Store: caisse rattachée à un magasin
+  storeId     String?
+  store       Store?   @relation(fields: [storeId], references: [id])
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -198,6 +202,7 @@ model CashRegister {
   @@index([code])
   @@index([status])
   @@index([isActive])
+  @@index([storeId])
   
   @@map("cash_registers")
 }
@@ -589,4 +594,127 @@ model Schedule {
   @@index([dayOfWeek])
   
   @@map("schedules")
+}
+
+// ========================================
+// LICENCES (SaaS - 2 offres: STANDARD / MULTI_STORE)
+// ========================================
+model License {
+  id            String   @id @default(cuid())
+  licenseKey    String   @unique // KABRAK-STD-2024-EASYSHOP-A7F3D9
+  
+  // Client
+  clientName    String
+  clientEmail   String
+  clientPhone   String
+  clientAddress String?
+  
+  // Type de licence
+  // STANDARD: 1 magasin, 300 000 FCFA/an
+  // MULTI_STORE: X magasins, sur devis
+  type          String   @default("STANDARD") // "STANDARD" | "MULTI_STORE"
+  maxStores     Int      @default(1)
+  
+  // Durée et dates
+  durationMonths Int     @default(12) // 6 ou 12
+  issuedAt      DateTime @default(now())
+  expiresAt     DateTime
+  renewedAt     DateTime?
+  
+  // Statut
+  status        String   @default("ACTIVE") // "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED"
+  
+  // Tracking
+  lastCheckAt   DateTime?
+  activations   Int      @default(0)
+  
+  // Notes internes (admin)
+  internalNotes String?
+  
+  // Relations
+  stores        Store[]
+  config        ClientConfig?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([licenseKey])
+  @@index([clientEmail])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([type])
+  
+  @@map("licenses")
+}
+
+// ========================================
+// MAGASINS (Multi-Store)
+// ========================================
+model Store {
+  id          String   @id @default(cuid())
+  licenseId   String
+  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  
+  name        String   // "Easy Shop Bonamoussadi"
+  code        String   @unique // "STORE001"
+  address     String?
+  phone       String?
+  city        String?
+  
+  // Actif/inactif
+  isActive    Boolean  @default(true)
+  
+  // Relations - chaque magasin a ses propres caisses, produits, etc.
+  cashRegisters CashRegister[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([licenseId])
+  @@index([code])
+  @@index([isActive])
+  
+  @@map("stores")
+}
+
+// ========================================
+// CONFIGURATION CLIENT (Multi-Tenant)
+// ========================================
+model ClientConfig {
+  id          String   @id @default(cuid())
+  licenseId   String   @unique
+  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  
+  // Identité du supermarché
+  supermarketName    String   // "Easy Shop"
+  supermarketSlogan  String?
+  logoUrl            String?  // URL ou base64
+  primaryColor       String   @default("#2563eb") // Couleur principale
+  
+  // Coordonnées (sur tickets/factures)
+  address    String?
+  phone      String?
+  email      String?
+  website    String?
+  
+  // Personnalisation tickets
+  receiptHeader    String? // Message en haut du ticket
+  receiptFooter    String? // "Merci de votre visite!"
+  receiptShowLogo  Boolean @default(true)
+  
+  // Personnalisation factures
+  invoiceFooter    String?
+  
+  // Devise
+  currency         String  @default("FCFA")
+  taxRate          Float   @default(15.5)
+  
+  // Paramètres POS
+  enableLoyalty    Boolean @default(true)
+  enableAutoPrint  Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("client_configs")
 }
