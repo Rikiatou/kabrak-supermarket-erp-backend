@@ -8,28 +8,25 @@ export class StockService {
 
   // Créer un mouvement de stock
   async createMovement(dto: CreateStockMovementDto) {
-    return this.prisma.$transaction(async (prisma) => {
-      // 1. Créer le mouvement
-      const movement = await prisma.stockMovement.create({
-        data: {
-          ...dto,
-          syncStatus: 'pending',
-        },
-        include: { product: true },
-      });
-
-      // 2. Mettre à jour le stock du produit
-      await prisma.product.update({
-        where: { id: dto.productId },
-        data: {
-          stock: {
-            increment: dto.quantity, // Positif ou négatif
-          },
-        },
-      });
-
-      return movement;
+    // Sequential queries — $transaction fails on Neon pooler
+    const movement = await this.prisma.stockMovement.create({
+      data: {
+        ...dto,
+        syncStatus: 'pending',
+      },
+      include: { product: true },
     });
+
+    await this.prisma.product.update({
+      where: { id: dto.productId },
+      data: {
+        stock: {
+          increment: dto.quantity,
+        },
+      },
+    });
+
+    return movement;
   }
 
   // Liste des mouvements
@@ -136,26 +133,24 @@ export class StockService {
 
     const difference = newStock - product.stock;
 
-    return this.prisma.$transaction(async (prisma) => {
-      const movement = await prisma.stockMovement.create({
-        data: {
-          productId,
-          type: 'adjustment',
-          quantity: difference,
-          reason,
-          notes: `Ajustement inventaire: ${product.stock} → ${newStock}`,
-          createdBy,
-          syncStatus: 'pending',
-        },
-      });
-
-      await prisma.product.update({
-        where: { id: productId },
-        data: { stock: newStock },
-      });
-
-      return movement;
+    const movement = await this.prisma.stockMovement.create({
+      data: {
+        productId,
+        type: 'adjustment',
+        quantity: difference,
+        reason,
+        notes: `Ajustement inventaire: ${product.stock} → ${newStock}`,
+        createdBy,
+        syncStatus: 'pending',
+      },
     });
+
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: { stock: newStock },
+    });
+
+    return movement;
   }
 
   // Valeur du stock

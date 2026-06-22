@@ -93,24 +93,22 @@ export class CustomersService {
   }
 
   async redeemPoints(customerId: string, points: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.update({
-        where: { id: customerId },
-        data: {
-          points: { decrement: points },
-        },
-      });
-
-      await tx.loyaltyHistory.create({
-        data: {
-          customerId,
-          points: -points,
-          reason: 'reward_redeemed',
-        },
-      });
-
-      return customer;
+    const customer = await this.prisma.customer.update({
+      where: { id: customerId },
+      data: {
+        points: { decrement: points },
+      },
     });
+
+    await this.prisma.loyaltyHistory.create({
+      data: {
+        customerId,
+        points: -points,
+        reason: 'reward_redeemed',
+      },
+    });
+
+    return customer;
   }
 
   async getStats() {

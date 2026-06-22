@@ -437,20 +437,19 @@ export class TransactionsService {
       throw new Error('Transaction déjà remboursée');
     }
 
-    // Rembourser dans une transaction DB
-    return this.prisma.$transaction(async (prisma) => {
-      // 1. Marquer comme remboursée
-      const updated = await prisma.transaction.update({
-        where: { id },
-        data: {
-          status: 'refunded',
-          syncStatus: 'pending', // Re-sync
-        },
-      });
+    // Refund — sequential queries ($transaction fails on Neon pooler)
+    const updated = await this.prisma.transaction.update({
+      where: { id },
+      data: {
+        status: 'refunded',
+        syncStatus: 'pending',
+      },
+    });
 
-      // 2. Remettre en stock
-      for (const item of transaction.items) {
-        await prisma.product.update({
+    // Remettre en stock
+    for (const item of transaction.items) {
+      try {
+        await this.prisma.product.update({
           where: { id: item.productId },
           data: {
             stock: {
@@ -459,7 +458,7 @@ export class TransactionsService {
           },
         });
 
-        await prisma.stockMovement.create({
+        await this.prisma.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'in',
@@ -469,10 +468,12 @@ export class TransactionsService {
             syncStatus: 'pending',
           },
         });
+      } catch (e) {
+        console.error(`Stock restore failed for product ${item.productId}:`, e);
       }
+    }
 
-      return updated;
-    });
+    return updated;
   }
 
   // Objectif mensuel (CA du mois vs objectif)

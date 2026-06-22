@@ -7,17 +7,22 @@ import { CreateRevenueDto } from './dto/create-revenue.dto';
 export class AccountingController {
   constructor(private readonly accountingService: AccountingService) {}
 
+  private parseDates(startDate?: string, endDate?: string) {
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    return { start, end };
+  }
+
   @Get('expenses')
   getExpenses(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Query('category') category?: string,
   ) {
-    return this.accountingService.getExpenses(
-      new Date(startDate),
-      new Date(endDate),
-      category,
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.accountingService.getExpenses(start, end, category);
   }
 
   @Post('expenses')
@@ -31,11 +36,8 @@ export class AccountingController {
     @Query('endDate') endDate: string,
     @Query('category') category?: string,
   ) {
-    return this.accountingService.getRevenues(
-      new Date(startDate),
-      new Date(endDate),
-      category,
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.accountingService.getRevenues(start, end, category);
   }
 
   @Post('revenues')
@@ -48,15 +50,15 @@ export class AccountingController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.accountingService.getProfitAndLoss(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.accountingService.getProfitAndLoss(start, end);
   }
 
   @Get('monthly-summary')
   getMonthlySummary(@Query('year') year: string) {
-    return this.accountingService.getMonthlySummary(parseInt(year, 10));
+    return this.accountingService.getMonthlySummary(
+      year ? parseInt(year, 10) : new Date().getFullYear(),
+    );
   }
 
   @Get('expense-breakdown')
@@ -64,9 +66,7 @@ export class AccountingController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.accountingService.getExpenseBreakdown(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.accountingService.getExpenseBreakdown(start, end);
   }
 }
