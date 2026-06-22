@@ -88,7 +88,7 @@ async function main() {
       firstName: 'Amina',
       lastName: 'Bello',
       role: 'boss',
-      department: 'Direction',
+      department: 'Management',
       phone: '+237 6 91 23 45 67',
       email: 'a.bello@kabrak.cm',
       hireDate: new Date('2021-03-15'),
@@ -103,7 +103,7 @@ async function main() {
       firstName: 'Jean-Paul',
       lastName: 'Mbarga',
       role: 'cashier',
-      department: 'Caisse',
+      department: 'Checkout',
       phone: '+237 6 72 34 56 78',
       email: 'jp.mbarga@kabrak.cm',
       hireDate: new Date('2022-07-01'),
@@ -118,7 +118,7 @@ async function main() {
       firstName: 'Fatou',
       lastName: 'Diallo',
       role: 'cashier',
-      department: 'Caisse',
+      department: 'Checkout',
       phone: '+237 6 63 45 67 89',
       email: 'f.diallo@kabrak.cm',
       hireDate: new Date('2023-01-10'),
@@ -133,7 +133,7 @@ async function main() {
       firstName: 'Omarou',
       lastName: 'Bouba',
       role: 'stockist',
-      department: 'Magasin',
+      department: 'Warehouse',
       phone: '+237 6 55 67 89 01',
       email: 'o.bouba@kabrak.cm',
       hireDate: new Date('2023-06-01'),
@@ -148,7 +148,7 @@ async function main() {
       firstName: 'Sophie',
       lastName: 'Kameni',
       role: 'accountant',
-      department: 'Comptabilité',
+      department: 'Accounting',
       phone: '+237 6 90 12 34 56',
       email: 's.kameni@kabrak.cm',
       hireDate: new Date('2022-01-15'),
@@ -157,14 +157,14 @@ async function main() {
     },
   });
 
-  console.log(`✅ 5 employés créés (boss, 2 caissiers, stocker, accountant)`);
+  console.log(`✅ 5 employees created (boss, 2 cashiers, stocker, accountant)`);
 
   // ========================================
   // CAISSES
   // ========================================
   await prisma.cashRegister.create({
     data: {
-      name: 'Caisse 1',
+      name: 'Register 1',
       code: 'REG001',
       status: 'closed',
       openingCash: 50000,
@@ -174,7 +174,7 @@ async function main() {
 
   await prisma.cashRegister.create({
     data: {
-      name: 'Caisse 2',
+      name: 'Register 2',
       code: 'REG002',
       status: 'closed',
       openingCash: 50000,
@@ -184,7 +184,7 @@ async function main() {
 
   await prisma.cashRegister.create({
     data: {
-      name: 'Caisse 3',
+      name: 'Register 3',
       code: 'REG003',
       status: 'closed',
       openingCash: 50000,
@@ -194,7 +194,7 @@ async function main() {
 
   const caisse4 = await prisma.cashRegister.create({
     data: {
-      name: 'Caisse 4',
+      name: 'Register 4',
       code: 'REG004',
       status: 'closed',
       openingCash: 50000,
@@ -211,107 +211,107 @@ async function main() {
     {
       sku: 'HV-5L-001',
       barcode: '0620012345678',
-      name: 'Huile Végétale 5L',
-      category: 'Épicerie',
-      subCategory: 'Huiles',
+      name: 'Vegetable Oil 5L',
+      category: 'Grocery',
+      subCategory: 'Oils',
       brand: 'SCTB',
       price: 5500,
       costPrice: 4100,
       stock: 50,
       minStock: 20,
-      unit: 'bouteille',
+      unit: 'bottle',
       supplierId: sctb.id,
     },
     {
       sku: 'EM-1.5-003',
       barcode: '0610098765432',
-      name: 'Eau Minérale Source 1.5L',
-      category: 'Boissons',
-      subCategory: 'Eaux',
+      name: 'Mineral Water Source 1.5L',
+      category: 'Beverages',
+      subCategory: 'Water',
       brand: 'SABC',
       price: 400,
       costPrice: 250,
       stock: 200,
       minStock: 50,
-      unit: 'bouteille',
+      unit: 'bottle',
       supplierId: sabc.id,
     },
     {
       sku: 'YN-500-012',
       barcode: '0630011223344',
-      name: 'Yaourt Nature Candia 500g',
-      category: 'Produits laitiers',
-      subCategory: 'Yaourts',
+      name: 'Plain Yogurt Candia 500g',
+      category: 'Dairy',
+      subCategory: 'Yogurt',
       brand: 'Candia',
       price: 1200,
       costPrice: 900,
       stock: 30,
       minStock: 30,
-      unit: 'pot',
+      unit: 'jar',
       expiryDate: new Date('2026-07-02'),
       supplierId: sabc.id,
     },
     {
       sku: 'RIZ-25-002',
       barcode: '0640055667788',
-      name: 'Riz Parfumé 25kg',
-      category: 'Épicerie',
-      subCategory: 'Riz',
+      name: 'Jasmine Rice 25kg',
+      category: 'Grocery',
+      subCategory: 'Rice',
       brand: 'Import Asie',
       price: 22000,
       costPrice: 17500,
       stock: 42,
       minStock: 15,
-      unit: 'sac',
+      unit: 'bag',
       supplierId: sctb.id,
     },
     {
       sku: 'SAVON-200-008',
       barcode: '0650099887766',
-      name: 'Savon Lux 200g',
-      category: 'Hygiène',
-      subCategory: 'Savons',
+      name: 'Soap Lux 200g',
+      category: 'Hygiene',
+      subCategory: 'Soap',
       brand: 'Unilever',
       price: 450,
       costPrice: 290,
       stock: 88,
       minStock: 40,
-      unit: 'barre',
+      unit: 'bar',
       supplierId: unilever.id,
     },
     {
       sku: 'BIERE-65-015',
       barcode: '0660012312399',
-      name: 'Bière 33 Export 65cl',
-      category: 'Boissons',
-      subCategory: 'Bières',
+      name: 'Beer 33 Export 65cl',
+      category: 'Beverages',
+      subCategory: 'Beer',
       brand: 'SABC',
       price: 900,
       costPrice: 580,
       stock: 120,
       minStock: 60,
-      unit: 'bouteille',
+      unit: 'bottle',
       supplierId: sabc.id,
     },
     {
       sku: 'PM-K-007',
       barcode: '0670033445566',
-      name: 'Pain de Mie Komplet',
-      category: 'Boulangerie',
-      subCategory: 'Pains',
-      brand: 'Boulangerie Centrale',
+      name: 'Whole Wheat Bread',
+      category: 'Bakery',
+      subCategory: 'Bread',
+      brand: 'Central Bakery',
       price: 800,
       costPrice: 480,
       stock: 3,
       minStock: 15,
-      unit: 'paquet',
+      unit: 'pack',
     },
     {
       sku: 'POULET-1KG-022',
       barcode: '0680077889900',
-      name: 'Poulet Congelé 1kg',
-      category: 'Boucherie',
-      subCategory: 'Volailles',
+      name: 'Frozen Chicken 1kg',
+      category: 'Butchery',
+      subCategory: 'Poultry',
       brand: 'Fermex',
       price: 3800,
       costPrice: 2900,
@@ -330,20 +330,20 @@ async function main() {
     data: {
       sku: 'YN-500-012-MD',
       barcode: '0630011223355',
-      name: 'Yaourt Nature Candia 500g (PROMO)',
-      category: 'Produits laitiers',
-      subCategory: 'Yaourts',
+      name: 'Plain Yogurt Candia 500g (PROMO)',
+      category: 'Dairy',
+      subCategory: 'Yogurt',
       brand: 'Candia',
       price: 1200,
       costPrice: 900,
       markdownPrice: 500,
       markdownReason: 'expiry',
-      markdownNote: 'Expire bientôt — destockage',
+      markdownNote: 'Expiring soon — clearance',
       markdownStartsAt: new Date(),
       markdownExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       stock: 15,
       minStock: 20,
-      unit: 'pot',
+      unit: 'jar',
       expiryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // expire dans 5 jours
       supplierId: sabc.id,
     },
@@ -354,21 +354,21 @@ async function main() {
     data: {
       sku: 'LAIT-1L-EXP',
       barcode: '0690011226677',
-      name: 'Lait Frais 1L (Expiré)',
-      category: 'Produits laitiers',
-      subCategory: 'Laits',
+      name: 'Fresh Milk 1L (Expired)',
+      category: 'Dairy',
+      subCategory: 'Milk',
       brand: 'Candia',
       price: 800,
       costPrice: 550,
       stock: 8,
       minStock: 20,
-      unit: 'bouteille',
+      unit: 'bottle',
       expiryDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // expiré depuis 2 jours
       supplierId: sabc.id,
     },
   });
 
-  console.log(`✅ ${products.length + 2} produits créés (dont 1 en markdown, 1 expiré)`);
+  console.log(`✅ ${products.length + 2} products created (including 1 markdown, 1 expired)`);
 
   // ========================================
   // PLANNING DES CAISSES
@@ -420,7 +420,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Plannings créés (Jean-Paul Caisse 1, Fatou Caisse 2, Sophie Caisse 4)`);
+  console.log(`✅ Schedules created (Jean-Paul Register 1, Fatou Register 2, Sophie Register 4)`);
 
   // ========================================
   // TRANSACTIONS (ventes du jour)

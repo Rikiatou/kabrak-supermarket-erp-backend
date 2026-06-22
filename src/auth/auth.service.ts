@@ -82,7 +82,7 @@ export class AuthService {
     return this.prisma.employee.findMany({
       where: {
         status: 'active',
-        role: { in: ['cashier', 'boss', 'accountant'] },
+        role: { in: ['cashier', 'boss', 'accountant', 'stockist'] },
       },
       select: {
         id: true,
