@@ -59,35 +59,36 @@ export class InvoicesService {
     const tax = 0;
     const total = subtotal;
 
-    return this.prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.create({
-        data: {
-          number,
-          clientName: dto.clientName,
-          clientPhone: dto.clientPhone,
-          clientEmail: dto.clientEmail || null,
-          clientAddress: dto.clientAddress || null,
-          customerId: dto.customerId || null,
-          dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-          subtotal,
-          taxRate,
-          tax,
-          total,
-          balance: total, // au départ, tout reste à payer
-          notes: dto.notes || null,
-          items: { create: items },
-        },
-        include: { items: true, payments: true },
-      });
+    // 1. Create the invoice
+    const invoice = await this.prisma.invoice.create({
+      data: {
+        number,
+        clientName: dto.clientName,
+        clientPhone: dto.clientPhone,
+        clientEmail: dto.clientEmail || null,
+        clientAddress: dto.clientAddress || null,
+        customerId: dto.customerId || null,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+        subtotal,
+        taxRate,
+        tax,
+        total,
+        balance: total,
+        notes: dto.notes || null,
+        items: { create: items },
+      },
+      include: { items: true, payments: true },
+    });
 
-      // Déduction du stock pour chaque item avec un productId
-      for (const item of items) {
-        if (item.productId) {
-          await tx.product.update({
+    // 2. Deduct stock for each item with a productId
+    for (const item of items) {
+      if (item.productId) {
+        try {
+          await this.prisma.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
           });
-          await tx.stockMovement.create({
+          await this.prisma.stockMovement.create({
             data: {
               productId: item.productId,
               type: 'out',
@@ -97,11 +98,13 @@ export class InvoicesService {
               notes: `Facture ${number}`,
             },
           });
+        } catch (e) {
+          console.error(`Stock deduction failed for product ${item.productId}:`, e);
         }
       }
+    }
 
-      return invoice;
-    });
+    return invoice;
   }
 
   // Encaisser un versement sur une facture
