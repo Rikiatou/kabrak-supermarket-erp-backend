@@ -46,7 +46,10 @@ export class StockService {
         where,
         skip,
         take: limit,
-        include: { product: true },
+        include: {
+          product: true,
+          employee: { select: { id: true, firstName: true, lastName: true, role: true } },
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.stockMovement.count({ where }),

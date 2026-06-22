@@ -261,6 +261,7 @@ model Employee {
   transactions  Transaction[]
   shifts        Shift[]
   schedules     Schedule[]
+  stockMovements StockMovement[] @relation("StockMovementEmployee")
   
   @@index([employeeNumber])
   @@index([role])
@@ -286,6 +287,7 @@ model StockMovement {
   
   notes       String?
   createdBy   String?  // ID employé
+  employee    Employee? @relation("StockMovementEmployee", fields: [createdBy], references: [id])
   
   // Synchronisation
   syncStatus  String   @default("pending")
