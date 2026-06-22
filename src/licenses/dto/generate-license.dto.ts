@@ -24,9 +24,9 @@ export class GenerateLicenseDto {
   @Max(100)
   maxStores?: number; // Pour MULTI_STORE
 
-  // Durée en mois: 6 ou 12
+  // Durée en mois: 1 (démo), 6 ou 12
   @IsInt()
-  @IsIn([6, 12])
+  @IsIn([1, 6, 12])
   durationMonths: number;
 
   @IsOptional()
