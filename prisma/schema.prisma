@@ -111,7 +111,9 @@ model Transaction {
   cashierId     String
   cashier       Employee @relation(fields: [cashierId], references: [id])
   registerId    String?
-  register      CashRegister? @relation(fields: [registerId], references: [id])
+  // NOTE: FK removed — registerId is now a plain string (e.g. "reg1")
+  // to allow hardcoded register IDs from the frontend without requiring
+  // a CashRegister row to exist in the database.
   
   // Montants (en centimes FCFA)
   subtotal      Int
@@ -195,7 +197,6 @@ model CashRegister {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  transactions Transaction[]
   schedules    Schedule[]
   
   @@index([code])

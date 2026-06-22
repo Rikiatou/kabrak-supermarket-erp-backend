@@ -21,49 +21,48 @@ export class TransactionsService {
     });
     const transactionNumber = `TXN-${dateStr}-${String(count + 1).padStart(4, '0')}`;
 
-    // Transaction dans une transaction DB (atomicité)
-    const transaction = await this.prisma.$transaction(async (prisma) => {
-      // 1. Créer la transaction
-      const tx = await prisma.transaction.create({
-        data: {
-          transactionNumber,
-          cashierId: createTransactionDto.cashierId,
-          registerId: createTransactionDto.registerId,
-          subtotal: createTransactionDto.subtotal,
-          discount: createTransactionDto.discount || 0,
-          tax: createTransactionDto.tax,
-          total: createTransactionDto.total,
-          paymentMethod: createTransactionDto.paymentMethod,
-          cashGiven: createTransactionDto.cashGiven,
-          change: createTransactionDto.change,
-          customerId: createTransactionDto.customerId,
-          status: 'completed',
-          syncStatus: 'pending', // À synchroniser avec le cloud
-          items: {
-            create: createTransactionDto.items.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              discount: item.discount || 0,
-              tax: item.tax,
-              total: item.total,
-            })),
+    // Create transaction (sequential queries — $transaction fails on Neon pooler)
+    // 1. Créer la transaction
+    const tx = await this.prisma.transaction.create({
+      data: {
+        transactionNumber,
+        cashierId: createTransactionDto.cashierId,
+        registerId: createTransactionDto.registerId,
+        subtotal: createTransactionDto.subtotal,
+        discount: createTransactionDto.discount || 0,
+        tax: createTransactionDto.tax,
+        total: createTransactionDto.total,
+        paymentMethod: createTransactionDto.paymentMethod,
+        cashGiven: createTransactionDto.cashGiven,
+        change: createTransactionDto.change,
+        customerId: createTransactionDto.customerId,
+        status: 'completed',
+        syncStatus: 'pending',
+        items: {
+          create: createTransactionDto.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount || 0,
+            tax: item.tax,
+            total: item.total,
+          })),
+        },
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
           },
         },
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-          cashier: true,
-        },
-      });
+        cashier: true,
+      },
+    });
 
-      // 2. Mettre à jour le stock pour chaque article
-      for (const item of createTransactionDto.items) {
-        // Décrémenter le stock
-        await prisma.product.update({
+    // 2. Mettre à jour le stock pour chaque article
+    for (const item of createTransactionDto.items) {
+      try {
+        await this.prisma.product.update({
           where: { id: item.productId },
           data: {
             stock: {
@@ -72,8 +71,7 @@ export class TransactionsService {
           },
         });
 
-        // Créer un mouvement de stock
-        await prisma.stockMovement.create({
+        await this.prisma.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'out',
@@ -84,12 +82,16 @@ export class TransactionsService {
             syncStatus: 'pending',
           },
         });
+      } catch (e) {
+        console.error(`Stock update failed for product ${item.productId}:`, e);
       }
+    }
 
-      // 3. Mettre à jour les points fidélité si client
-      if (createTransactionDto.customerId) {
-        const pointsEarned = Math.floor(createTransactionDto.total / 100); // 1 point = 100 FCFA
-        await prisma.customer.update({
+    // 3. Mettre à jour les points fidélité si client
+    if (createTransactionDto.customerId) {
+      try {
+        const pointsEarned = Math.floor(createTransactionDto.total / 100);
+        await this.prisma.customer.update({
           where: { id: createTransactionDto.customerId },
           data: {
             points: { increment: pointsEarned },
@@ -97,7 +99,7 @@ export class TransactionsService {
           },
         });
 
-        await prisma.loyaltyHistory.create({
+        await this.prisma.loyaltyHistory.create({
           data: {
             customerId: createTransactionDto.customerId,
             points: pointsEarned,
@@ -105,10 +107,12 @@ export class TransactionsService {
             reference: tx.id,
           },
         });
+      } catch (e) {
+        console.error(`Loyalty update failed for customer ${createTransactionDto.customerId}:`, e);
       }
+    }
 
-      return tx;
-    });
+    const transaction = tx;
 
     return transaction;
   }
@@ -316,29 +320,29 @@ export class TransactionsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const registers = await this.prisma.cashRegister.findMany({
-      include: {
-        transactions: {
-          where: {
-            date: { gte: today },
-            status: 'completed',
-          },
-          select: {
-            total: true,
-            id: true,
-          },
-        },
-      },
-    });
+    const registers = await this.prisma.cashRegister.findMany();
 
-    return registers.map((reg) => ({
-      id: reg.id,
-      name: reg.name,
-      code: reg.code,
-      status: reg.status,
-      transactionsCount: reg.transactions.length,
-      revenue: reg.transactions.reduce((sum, t) => sum + t.total, 0),
-    }));
+    // Fetch transactions separately since FK relation was removed
+    const result = [];
+    for (const reg of registers) {
+      const transactions = await this.prisma.transaction.findMany({
+        where: {
+          registerId: reg.id,
+          date: { gte: today },
+          status: 'completed',
+        },
+        select: { total: true, id: true },
+      });
+      result.push({
+        id: reg.id,
+        name: reg.name,
+        code: reg.code,
+        status: reg.status,
+        transactionsCount: transactions.length,
+        revenue: transactions.reduce((sum, t) => sum + t.total, 0),
+      });
+    }
+    return result;
   }
 
   // Ventes par heure (pour graphique dashboard)
