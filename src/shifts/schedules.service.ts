@@ -21,13 +21,7 @@ export class SchedulesService {
       );
     }
 
-    // Vérifier que la caisse existe
-    const register = await this.prisma.cashRegister.findUnique({
-      where: { id: dto.registerId },
-    });
-    if (!register) {
-      throw new NotFoundException(`Caisse #${dto.registerId} non trouvée`);
-    }
+    // NOTE: registerId is now a plain string (e.g. "reg1") — no FK check needed
 
     // Vérifier que startTime < endTime
     if (dto.startTime >= dto.endTime) {
@@ -56,8 +50,7 @@ export class SchedulesService {
       data: dto,
       include: {
         employee: true,
-        register: true,
-      },
+              },
     });
   }
 
@@ -67,8 +60,7 @@ export class SchedulesService {
       where: { isActive: true },
       include: {
         employee: true,
-        register: true,
-      },
+              },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
 
@@ -92,7 +84,7 @@ export class SchedulesService {
   async findByEmployee(employeeId: string) {
     return this.prisma.schedule.findMany({
       where: { employeeId, isActive: true },
-      include: { register: true },
+      include: { employee: true },
       orderBy: { dayOfWeek: 'asc' },
     });
   }
@@ -121,8 +113,7 @@ export class SchedulesService {
       },
       include: {
         employee: true,
-        register: true,
-      },
+              },
       orderBy: { startTime: 'asc' },
     });
 
@@ -149,8 +140,7 @@ export class SchedulesService {
       data: dto,
       include: {
         employee: true,
-        register: true,
-      },
+              },
     });
   }
 
@@ -202,8 +192,7 @@ export class SchedulesService {
       },
       include: {
         employee: true,
-        register: true,
-      },
+              },
     });
   }
 }

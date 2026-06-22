@@ -196,9 +196,9 @@ model CashRegister {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  schedules    Schedule[]
-  
+
+  // NOTE: schedules back-relation removed — registerId is now a plain string
+
   @@index([code])
   @@index([status])
   @@index([isActive])
@@ -568,8 +568,9 @@ model Schedule {
   employeeId  String
   employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
-  registerId  String
-  register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  registerId  String  // Plain string (e.g. "reg1") — no FK
+  // NOTE: FK removed — registerId is now a plain string to allow hardcoded
+  // register IDs from the frontend without requiring a CashRegister row.
   
   // Jour de la semaine: 0=dimanche, 1=lundi, ..., 6=samedi
   dayOfWeek   Int

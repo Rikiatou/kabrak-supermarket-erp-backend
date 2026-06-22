@@ -76,7 +76,7 @@ export class PurchaseOrdersService {
       data: {
         orderNumber,
         supplierId: dto.supplierId,
-        expectedDate: new Date(dto.expectedDate),
+        expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : new Date(),
         notes: dto.notes,
         total,
         status: 'draft',
