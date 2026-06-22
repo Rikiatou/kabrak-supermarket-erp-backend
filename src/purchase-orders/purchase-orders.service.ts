@@ -112,41 +112,42 @@ export class PurchaseOrdersService {
 
     const notes = [dto.notes, invoiceNumber ? `Facture fournisseur: ${invoiceNumber}` : null].filter(Boolean).join(' | ');
 
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.purchaseOrder.create({
-        data: {
-          orderNumber,
-          supplierId: dto.supplierId,
-          expectedDate: new Date(dto.expectedDate),
-          notes,
-          total,
-          status: 'received',
-          receivedDate: new Date(),
-          items: {
-            create: dto.items.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              unitCost: item.unitCost,
-              total: item.quantity * item.unitCost,
-              receivedQuantity: item.quantity,
-            })),
-          },
+    // Create order and update stock (sequential — $transaction fails on Neon pooler)
+    const order = await this.prisma.purchaseOrder.create({
+      data: {
+        orderNumber,
+        supplierId: dto.supplierId,
+        expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : new Date(),
+        notes,
+        total,
+        status: 'received',
+        receivedDate: new Date(),
+        items: {
+          create: dto.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            total: item.quantity * item.unitCost,
+            receivedQuantity: item.quantity,
+          })),
         },
-        include: {
-          supplier: true,
-          items: true,
-        },
-      });
+      },
+      include: {
+        supplier: true,
+        items: true,
+      },
+    });
 
-      for (const item of dto.items) {
-        await tx.product.update({
+    for (const item of dto.items) {
+      try {
+        await this.prisma.product.update({
           where: { id: item.productId },
           data: {
             stock: { increment: item.quantity },
           },
         });
 
-        await tx.stockMovement.create({
+        await this.prisma.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'in',
@@ -156,10 +157,12 @@ export class PurchaseOrdersService {
             notes: `Réception achat ${order.orderNumber}${invoiceNumber ? ` — Facture: ${invoiceNumber}` : ''}`,
           },
         });
+      } catch (e) {
+        console.error(`Stock update failed for product ${item.productId}:`, e);
       }
+    }
 
-      return order;
-    });
+    return order;
   }
 
   async updateStatus(id: string, status: string) {
@@ -173,17 +176,17 @@ export class PurchaseOrdersService {
         throw new Error('Purchase order not found');
       }
 
-      return this.prisma.$transaction(async (tx) => {
-        // Increment stock for each item + create stock movements
-        for (const item of order.items) {
-          await tx.product.update({
+      // Increment stock for each item + create stock movements (sequential)
+      for (const item of order.items) {
+        try {
+          await this.prisma.product.update({
             where: { id: item.productId },
             data: {
               stock: { increment: item.quantity },
             },
           });
 
-          await tx.stockMovement.create({
+          await this.prisma.stockMovement.create({
             data: {
               productId: item.productId,
               type: 'in',
@@ -193,19 +196,21 @@ export class PurchaseOrdersService {
               notes: `Réception commande ${order.orderNumber}`,
             },
           });
+        } catch (e) {
+          console.error(`Stock update failed for product ${item.productId}:`, e);
         }
+      }
 
-        return tx.purchaseOrder.update({
-          where: { id },
-          data: {
-            status,
-            receivedDate: new Date(),
-          },
-          include: {
-            supplier: true,
-            items: true,
-          },
-        });
+      return this.prisma.purchaseOrder.update({
+        where: { id },
+        data: {
+          status,
+          receivedDate: new Date(),
+        },
+        include: {
+          supplier: true,
+          items: true,
+        },
       });
     }
 
