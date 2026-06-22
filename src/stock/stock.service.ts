@@ -64,13 +64,10 @@ export class StockService {
       this.prisma.product.findMany({
         where: {
           isActive: true,
-          stock: {
-            lte: this.prisma.product.fields.minStock,
-            gt: 0,
-          },
+          stock: { gt: 0 },
         },
         orderBy: { stock: 'asc' },
-      }),
+      }).then(products => products.filter(p => p.stock <= p.minStock)),
       this.prisma.product.findMany({
         where: { isActive: true, stock: 0 },
         orderBy: { name: 'asc' },
