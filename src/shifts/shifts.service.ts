@@ -11,13 +11,11 @@ export class ShiftsService {
     return this.prisma.shift.create({
       data: {
         registerId: dto.registerId,
+        registerName: dto.registerName || null,
         employeeId: dto.employeeId,
+        employeeName: dto.employeeName || null,
         openingCash: dto.openingCash,
         status: 'open',
-      },
-      include: {
-        register: true,
-        employee: true,
       },
     });
   }
@@ -35,20 +33,12 @@ export class ShiftsService {
         status: 'closed',
         notes: dto.notes,
       },
-      include: {
-        register: true,
-        employee: true,
-      },
     });
   }
 
   async findActive() {
     return this.prisma.shift.findMany({
       where: { status: 'open' },
-      include: {
-        register: true,
-        employee: true,
-      },
       orderBy: { openedAt: 'desc' },
     });
   }
@@ -56,9 +46,6 @@ export class ShiftsService {
   async findByEmployee(employeeId: string) {
     return this.prisma.shift.findMany({
       where: { employeeId },
-      include: {
-        register: true,
-      },
       orderBy: { openedAt: 'desc' },
     });
   }
@@ -68,10 +55,6 @@ export class ShiftsService {
 
     const [shifts, total] = await Promise.all([
       this.prisma.shift.findMany({
-        include: {
-          register: true,
-          employee: true,
-        },
         orderBy: { openedAt: 'desc' },
         skip,
         take: limit,

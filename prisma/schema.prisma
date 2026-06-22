@@ -196,7 +196,6 @@ model CashRegister {
   updatedAt   DateTime @updatedAt
   
   transactions Transaction[]
-  shifts       Shift[]
   schedules    Schedule[]
   
   @@index([code])
@@ -210,11 +209,11 @@ model CashRegister {
 model Shift {
   id            String   @id @default(cuid())
   
-  registerId    String
-  register      CashRegister @relation(fields: [registerId], references: [id])
+  registerId    String   // Plain string (e.g. "reg1") — no FK
+  registerName  String?  // Display name (e.g. "Caisse 1")
   
   employeeId    String
-  employee      Employee @relation(fields: [employeeId], references: [id])
+  employeeName  String?  // Display name (e.g. "Paul Mbarga")
   
   openedAt      DateTime @default(now())
   closedAt      DateTime?
@@ -259,7 +258,6 @@ model Employee {
   updatedAt     DateTime @updatedAt
   
   transactions  Transaction[]
-  shifts        Shift[]
   schedules     Schedule[]
   stockMovements StockMovement[] @relation("StockMovementEmployee")
   
