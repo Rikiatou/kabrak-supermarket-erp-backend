@@ -82,75 +82,75 @@ async function main() {
   // ========================================
   // EMPLOYÉS
   // ========================================
-  const amina = await prisma.employee.create({
+  const grace = await prisma.employee.create({
     data: {
       employeeNumber: 'EMP001',
-      firstName: 'Amina',
-      lastName: 'Bello',
+      firstName: 'Grace',
+      lastName: 'Johnson',
       role: 'boss',
       department: 'Management',
       phone: '+237 6 91 23 45 67',
-      email: 'a.bello@kabrak.cm',
+      email: 'g.johnson@kabrak.cm',
       hireDate: new Date('2021-03-15'),
       status: 'active',
       pin: '1234',
     },
   });
 
-  const jeanPaul = await prisma.employee.create({
+  const paul = await prisma.employee.create({
     data: {
       employeeNumber: 'EMP002',
-      firstName: 'Jean-Paul',
+      firstName: 'Paul',
       lastName: 'Mbarga',
       role: 'cashier',
       department: 'Checkout',
       phone: '+237 6 72 34 56 78',
-      email: 'jp.mbarga@kabrak.cm',
+      email: 'p.mbarga@kabrak.cm',
       hireDate: new Date('2022-07-01'),
       status: 'active',
       pin: '2345',
     },
   });
 
-  const fatou = await prisma.employee.create({
+  const esther = await prisma.employee.create({
     data: {
       employeeNumber: 'EMP003',
-      firstName: 'Fatou',
+      firstName: 'Esther',
       lastName: 'Diallo',
       role: 'cashier',
       department: 'Checkout',
       phone: '+237 6 63 45 67 89',
-      email: 'f.diallo@kabrak.cm',
+      email: 'e.diallo@kabrak.cm',
       hireDate: new Date('2023-01-10'),
       status: 'active',
       pin: '3456',
     },
   });
 
-  const omarou = await prisma.employee.create({
+  const david = await prisma.employee.create({
     data: {
       employeeNumber: 'EMP004',
-      firstName: 'Omarou',
+      firstName: 'David',
       lastName: 'Bouba',
       role: 'stockist',
       department: 'Warehouse',
       phone: '+237 6 55 67 89 01',
-      email: 'o.bouba@kabrak.cm',
+      email: 'd.bouba@kabrak.cm',
       hireDate: new Date('2023-06-01'),
       status: 'active',
       pin: '4567',
     },
   });
 
-  const sophie = await prisma.employee.create({
+  const rebecca = await prisma.employee.create({
     data: {
       employeeNumber: 'EMP005',
-      firstName: 'Sophie',
+      firstName: 'Rebecca',
       lastName: 'Kameni',
       role: 'accountant',
       department: 'Accounting',
       phone: '+237 6 90 12 34 56',
-      email: 's.kameni@kabrak.cm',
+      email: 'r.kameni@kabrak.cm',
       hireDate: new Date('2022-01-15'),
       status: 'active',
       pin: '5678',
@@ -377,11 +377,11 @@ async function main() {
   const caisse2 = await prisma.cashRegister.findFirst({ where: { code: 'REG002' } });
 
   if (caisse1 && caisse2) {
-    // Jean-Paul: Caisse 1, lundi à vendredi, 8h-17h
+    // Paul: Register 1, Monday to Friday, 8h-17h
     for (let day = 1; day <= 5; day++) {
       await prisma.schedule.create({
         data: {
-          employeeId: jeanPaul.id,
+          employeeId: paul.id,
           registerId: caisse1.id,
           dayOfWeek: day,
           startTime: '08:00',
@@ -391,11 +391,11 @@ async function main() {
         },
       });
     }
-    // Fatou: Caisse 2, lundi à samedi, 9h-18h
+    // Esther: Register 2, Monday to Saturday, 9h-18h
     for (let day = 1; day <= 6; day++) {
       await prisma.schedule.create({
         data: {
-          employeeId: fatou.id,
+          employeeId: esther.id,
           registerId: caisse2.id,
           dayOfWeek: day,
           startTime: '09:00',
@@ -405,11 +405,11 @@ async function main() {
         },
       });
     }
-    // Sophie: Caisse 3, mardi et jeudi (supervision)
+    // Rebecca: Register 3, Tuesday and Thursday (supervision)
     for (const day of [2, 4]) {
       await prisma.schedule.create({
         data: {
-          employeeId: sophie.id,
+          employeeId: rebecca.id,
           registerId: caisse4.id,
           dayOfWeek: day,
           startTime: '10:00',
@@ -420,7 +420,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Schedules created (Jean-Paul Register 1, Fatou Register 2, Sophie Register 4)`);
+  console.log(`✅ Schedules created (Paul Register 1, Esther Register 2, Rebecca Register 4)`);
 
   // ========================================
   // TRANSACTIONS (ventes du jour)
@@ -430,11 +430,11 @@ async function main() {
 
   const allProducts = await prisma.product.findMany();
   const sampleTransactions = [
-    { items: [{ idx: 1, qty: 2 }, { idx: 4, qty: 5 }], method: 'cash', cashier: jeanPaul.id },
-    { items: [{ idx: 5, qty: 3 }, { idx: 0, qty: 1 }], method: 'mobile', cashier: fatou.id },
-    { items: [{ idx: 2, qty: 4 }, { idx: 3, qty: 1 }], method: 'cash', cashier: jeanPaul.id },
-    { items: [{ idx: 1, qty: 10 }, { idx: 4, qty: 2 }], method: 'card', cashier: fatou.id },
-    { items: [{ idx: 6, qty: 2 }], method: 'cash', cashier: jeanPaul.id },
+    { items: [{ idx: 1, qty: 2 }, { idx: 4, qty: 5 }], method: 'cash', cashier: paul.id },
+    { items: [{ idx: 5, qty: 3 }, { idx: 0, qty: 1 }], method: 'mobile', cashier: esther.id },
+    { items: [{ idx: 2, qty: 4 }, { idx: 3, qty: 1 }], method: 'cash', cashier: paul.id },
+    { items: [{ idx: 1, qty: 10 }, { idx: 4, qty: 2 }], method: 'card', cashier: esther.id },
+    { items: [{ idx: 6, qty: 2 }], method: 'cash', cashier: paul.id },
   ];
 
   for (let i = 0; i < sampleTransactions.length; i++) {
