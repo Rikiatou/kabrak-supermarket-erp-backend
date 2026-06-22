@@ -1,6 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// Support DATABASE_URL override (pour déploiement)
+const prisma = new PrismaClient(
+  process.env.DATABASE_URL
+    ? {
+        datasources: {
+          db: {
+            url: process.env.DATABASE_URL,
+          },
+        },
+      }
+    : undefined
+);
 
 async function main() {
   console.log('🌱 Début du seed...');
@@ -548,7 +559,7 @@ async function main() {
   await prisma.license.deleteMany();
 
   const demoExpiresAt = new Date();
-  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 12);
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
 
   const demoLicense = await prisma.license.create({
     data: {
@@ -559,11 +570,11 @@ async function main() {
       clientAddress: 'Limbe, Cameroun',
       type: 'STANDARD',
       maxStores: 1,
-      durationMonths: 12,
+      durationMonths: 1,
       issuedAt: new Date(),
       expiresAt: demoExpiresAt,
       status: 'ACTIVE',
-      internalNotes: 'Licence de démonstration — Easy Shop Limbe',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
       config: {
         create: {
           supermarketName: 'Easy Shop',

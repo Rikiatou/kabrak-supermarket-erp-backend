@@ -8,7 +8,10 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { LicensesService } from './licenses.service';
 import { GenerateLicenseDto } from './dto/generate-license.dto';
 import { ValidateLicenseDto } from './dto/validate-license.dto';
@@ -16,10 +19,14 @@ import { RenewLicenseDto } from './dto/renew-license.dto';
 import { UpdateClientConfigDto } from './dto/update-client-config.dto';
 import { Public } from '../auth/public.decorator';
 import { AuthGuard } from '../auth/auth.guard';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Controller('licenses')
 export class LicensesController {
-  constructor(private readonly licensesService: LicensesService) {}
+  constructor(
+    private readonly licensesService: LicensesService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   // ========================================
   // ENDPOINTS PUBLICS (pas d'auth requise)
@@ -100,6 +107,27 @@ export class LicensesController {
     @Body() dto: UpdateClientConfigDto,
   ) {
     return this.licensesService.updateConfig(licenseKey, dto);
+  }
+
+  // Upload logo client
+  @Public()
+  @Post(':licenseKey/upload-logo')
+  @UseInterceptors(FileInterceptor('logo'))
+  async uploadLogo(
+    @Param('licenseKey') licenseKey: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Aucun fichier fourni');
+    }
+
+    // Upload vers Cloudinary
+    const logoUrl = await this.cloudinaryService.uploadImage(file);
+
+    // Mettre à jour la config
+    await this.licensesService.updateConfig(licenseKey, { logoUrl });
+
+    return { logoUrl };
   }
 
   // Ajouter un magasin (Multi-Store)
