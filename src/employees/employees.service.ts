@@ -49,10 +49,6 @@ export class EmployeesService {
             status: true,
           },
         },
-        shifts: {
-          take: 10,
-          orderBy: { openedAt: 'desc' },
-        },
       },
     });
   }

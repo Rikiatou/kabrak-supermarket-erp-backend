@@ -152,10 +152,6 @@ export class NotificationsService {
         closedAt: { gte: todayStart },
         difference: { not: 0 },
       },
-      include: {
-        register: true,
-        employee: true,
-      },
       take: 10,
     });
     cashDiffs.forEach((s) => {
@@ -164,8 +160,8 @@ export class NotificationsService {
         id: `cashdiff-${s.id}`,
         type: 'cash_diff',
         priority: diff < -1000 ? 'critical' : diff < 0 ? 'high' : 'low',
-        title: `Écart de caisse: ${s.register?.name || 'Caisse'}`,
-        message: `${s.register?.name}: écart de ${diff >= 0 ? '+' : ''}${diff} FCFA par ${s.employee?.firstName} ${s.employee?.lastName}.`,
+        title: `Écart de caisse: ${s.registerName || 'Caisse'}`,
+        message: `${s.registerName || 'Caisse'}: écart de ${diff >= 0 ? '+' : ''}${diff} FCFA par ${s.employeeName || 'N/A'}.`,
         shiftId: s.id,
         action: 'Voir le shift',
         actionUrl: '/caisses',
