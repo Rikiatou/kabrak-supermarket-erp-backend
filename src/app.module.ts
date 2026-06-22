@@ -23,6 +23,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CronModule } from './cron/cron.module';
 import { LicensesModule } from './licenses/licenses.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { LicensesModule } from './licenses/licenses.module';
     DatabaseModule,
     AuthModule,
     LicensesModule,
+    AdminModule,
     ProductsModule,
     TransactionsModule,
     StockModule,
