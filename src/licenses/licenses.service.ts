@@ -63,6 +63,10 @@ export class LicensesService {
 
     const licenseKey = this.generateLicenseKey(dto);
     const expiresAt = this.computeExpirationDate(dto.durationMonths);
+    const clientSlug = dto.clientName
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .substring(0, 12);
 
     // Créer la licence + config client par défaut + 1 magasin par défaut
     const license = await this.prisma.license.create({
@@ -91,12 +95,12 @@ export class LicensesService {
             enableAutoPrint: false,
           },
         },
-        // Créer le magasin principal
+        // Créer le magasin principal (code unique basé sur le slug client)
         stores: {
           create: [
             {
               name: dto.clientName,
-              code: 'STORE001',
+              code: `${clientSlug}-001`,
               isActive: true,
             },
           ],
