@@ -2,10 +2,14 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestj
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { PrismaService } from '../database/prisma.service';
 
 @Controller('invoices')
 export class InvoicesController {
-  constructor(private invoicesService: InvoicesService) {}
+  constructor(
+    private invoicesService: InvoicesService,
+    private prisma: PrismaService,
+  ) {}
 
   @Get()
   findAll(
@@ -28,6 +32,20 @@ export class InvoicesController {
   @Get('stats/unpaid')
   getUnpaidStats() {
     return this.invoicesService.getUnpaidStats();
+  }
+
+  // Marquer manuellement les factures en retard (appelé par le frontend ou admin)
+  @Post('check-overdue')
+  async checkOverdue() {
+    const now = new Date();
+    const result = await this.prisma.invoice.updateMany({
+      where: {
+        status: { in: ['pending', 'partial', 'sent'] },
+        dueDate: { lt: now },
+      },
+      data: { status: 'overdue' },
+    });
+    return { success: true, markedOverdue: result.count };
   }
 
   @Get(':id')
