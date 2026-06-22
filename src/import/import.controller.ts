@@ -5,6 +5,7 @@ import {
   Body,
   UploadedFile,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImportService } from './import.service';
@@ -17,7 +18,7 @@ export class ImportController {
   @Post('products')
   async importProducts(@Body('csv') csv: string) {
     if (!csv) {
-      throw new Error('Données CSV manquantes');
+      throw new BadRequestException('Données CSV manquantes');
     }
     return this.importService.importProducts(csv);
   }
@@ -27,7 +28,7 @@ export class ImportController {
   @UseInterceptors(FileInterceptor('file'))
   async importProductsFile(@UploadedFile() file: any) {
     if (!file) {
-      throw new Error('Fichier manquant');
+      throw new BadRequestException('Fichier manquant');
     }
     const csvText = file.buffer.toString('utf-8');
     return this.importService.importProducts(csvText);

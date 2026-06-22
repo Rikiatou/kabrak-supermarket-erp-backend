@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 
@@ -173,7 +173,7 @@ export class PurchaseOrdersService {
       });
 
       if (!order) {
-        throw new Error('Purchase order not found');
+        throw new NotFoundException(`Purchase order #${id} not found`);
       }
 
       // Increment stock for each item + create stock movements (sequential)

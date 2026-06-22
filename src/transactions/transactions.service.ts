@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
@@ -434,7 +434,7 @@ export class TransactionsService {
     const transaction = await this.findOne(id);
 
     if (transaction.status === 'refunded') {
-      throw new Error('Transaction déjà remboursée');
+      throw new BadRequestException('Transaction déjà remboursée');
     }
 
     // Refund — sequential queries ($transaction fails on Neon pooler)

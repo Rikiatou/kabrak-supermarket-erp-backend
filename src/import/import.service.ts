@@ -96,7 +96,7 @@ export class ImportService {
         try {
           // Validation
           if (!data.sku || !data.barcode || !data.name) {
-            throw new Error('SKU, barcode et name sont obligatoires');
+            throw new BadRequestException('SKU, barcode et name sont obligatoires');
           }
 
           const price = parseInt(data.price) || 0;
@@ -105,7 +105,7 @@ export class ImportService {
           const minStock = parseInt(data.minstock || data.min_stock || '10') || 10;
 
           if (price < 0 || stock < 0) {
-            throw new Error('Prix et stock doivent être positifs');
+            throw new BadRequestException('Prix et stock doivent être positifs');
           }
 
           productsToCreate.push({
