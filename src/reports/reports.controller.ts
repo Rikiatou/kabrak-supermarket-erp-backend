@@ -5,15 +5,22 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
+  // Helper: parse query dates with sensible defaults
+  private parseDates(startDate?: string, endDate?: string) {
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(new Date().getFullYear(), new Date().getMonth(), 1); // 1st of current month
+    return { start, end };
+  }
+
   @Get('sales')
   getSalesReport(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.reportsService.getSalesReport(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.reportsService.getSalesReport(start, end);
   }
 
   @Get('sales/by-category')
@@ -21,10 +28,8 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.reportsService.getSalesByCategory(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.reportsService.getSalesByCategory(start, end);
   }
 
   @Get('sales/by-employee')
@@ -32,10 +37,8 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.reportsService.getSalesByEmployee(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.reportsService.getSalesByEmployee(start, end);
   }
 
   @Get('products/top')
@@ -44,9 +47,10 @@ export class ReportsController {
     @Query('endDate') endDate: string,
     @Query('limit') limit?: string,
   ) {
+    const { start, end } = this.parseDates(startDate, endDate);
     return this.reportsService.getTopProducts(
-      new Date(startDate),
-      new Date(endDate),
+      start,
+      end,
       limit ? parseInt(limit, 10) : 20,
     );
   }
@@ -57,9 +61,10 @@ export class ReportsController {
     @Query('endDate') endDate: string,
     @Query('limit') limit?: string,
   ) {
+    const { start, end } = this.parseDates(startDate, endDate);
     return this.reportsService.getWorstProducts(
-      new Date(startDate),
-      new Date(endDate),
+      start,
+      end,
       limit ? parseInt(limit, 10) : 20,
     );
   }
@@ -69,10 +74,8 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.reportsService.getProfitAnalysis(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.reportsService.getProfitAnalysis(start, end);
   }
 
   @Get('sales/by-day')
@@ -80,15 +83,15 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.reportsService.getSalesByDay(
-      new Date(startDate),
-      new Date(endDate),
-    );
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.reportsService.getSalesByDay(start, end);
   }
 
   @Get('sales/by-month')
   getSalesByMonth(@Query('year') year: string) {
-    return this.reportsService.getSalesByMonth(parseInt(year, 10));
+    return this.reportsService.getSalesByMonth(
+      year ? parseInt(year, 10) : new Date().getFullYear(),
+    );
   }
 
   @Get('inventory/valuation')
