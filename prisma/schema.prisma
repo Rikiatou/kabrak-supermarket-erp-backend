@@ -698,7 +698,13 @@ model ClientConfig {
   phone      String?
   email      String?
   website    String?
-  
+
+  // Informations légales / société
+  rccmNumber    String?  // N° RC: CM/YDE/2024/B/123
+  taxNumber     String?  // N° contribuable / Tax ID
+  legalForm     String?  // SARL, EURL, etc.
+  capital       String?  // Capital social
+
   // Personnalisation tickets
   receiptHeader    String? // Message en haut du ticket
   receiptFooter    String? // "Merci de votre visite!"

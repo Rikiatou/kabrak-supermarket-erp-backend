@@ -55,28 +55,52 @@ export class InvoicesService {
     }));
 
     const subtotal = items.reduce((s, i) => s + i.total, 0);
-    const taxRate = 15.5;
-    const tax = Math.round(subtotal * (taxRate / 100));
-    const total = subtotal + tax;
+    const taxRate = 0;
+    const tax = 0;
+    const total = subtotal;
 
-    return this.prisma.invoice.create({
-      data: {
-        number,
-        clientName: dto.clientName,
-        clientPhone: dto.clientPhone,
-        clientEmail: dto.clientEmail || null,
-        clientAddress: dto.clientAddress || null,
-        customerId: dto.customerId || null,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-        subtotal,
-        taxRate,
-        tax,
-        total,
-        balance: total, // au départ, tout reste à payer
-        notes: dto.notes || null,
-        items: { create: items },
-      },
-      include: { items: true, payments: true },
+    return this.prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.create({
+        data: {
+          number,
+          clientName: dto.clientName,
+          clientPhone: dto.clientPhone,
+          clientEmail: dto.clientEmail || null,
+          clientAddress: dto.clientAddress || null,
+          customerId: dto.customerId || null,
+          dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+          subtotal,
+          taxRate,
+          tax,
+          total,
+          balance: total, // au départ, tout reste à payer
+          notes: dto.notes || null,
+          items: { create: items },
+        },
+        include: { items: true, payments: true },
+      });
+
+      // Déduction du stock pour chaque item avec un productId
+      for (const item of items) {
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: 'out',
+              quantity: -item.quantity,
+              reason: 'invoice',
+              reference: number,
+              notes: `Facture ${number}`,
+            },
+          });
+        }
+      }
+
+      return invoice;
     });
   }
 
