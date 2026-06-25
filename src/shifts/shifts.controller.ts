@@ -25,6 +25,11 @@ export class ShiftsController {
     return this.shiftsService.findByEmployee(employeeId);
   }
 
+  @Get(':id/z-report')
+  getZReport(@Param('id') id: string) {
+    return this.shiftsService.getZReport(id);
+  }
+
   @Post('open')
   openShift(@Body() dto: OpenShiftDto) {
     return this.shiftsService.openShift(dto);

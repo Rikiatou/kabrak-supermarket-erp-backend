@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { OpenShiftDto } from './dto/open-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
@@ -52,7 +52,6 @@ export class ShiftsService {
 
   async findAll(page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
-
     const [shifts, total] = await Promise.all([
       this.prisma.shift.findMany({
         orderBy: { openedAt: 'desc' },
@@ -68,6 +67,128 @@ export class ShiftsService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  // Z-Report: rapport de clôture de caisse
+  async getZReport(shiftId: string) {
+    const shift = await this.prisma.shift.findUnique({
+      where: { id: shiftId },
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift not found');
+    }
+
+    const startTime = shift.openedAt;
+    const endTime = shift.closedAt || new Date();
+
+    // Toutes les transactions de cette caisse pendant le shift
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        registerId: shift.registerId,
+        date: { gte: startTime, lte: endTime },
+        status: 'completed',
+      },
+      select: {
+        id: true,
+        transactionNumber: true,
+        date: true,
+        subtotal: true,
+        discount: true,
+        tax: true,
+        total: true,
+        paymentMethod: true,
+        cashGiven: true,
+        change: true,
+        cashierId: true,
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // Agrégations
+    const grossSales = transactions.reduce((s, t) => s + t.subtotal, 0);
+    const totalDiscount = transactions.reduce((s, t) => s + t.discount, 0);
+    const totalTax = transactions.reduce((s, t) => s + t.tax, 0);
+    const netSales = transactions.reduce((s, t) => s + t.total, 0);
+    const customerCount = transactions.length;
+    const averageSale = customerCount > 0 ? Math.round(netSales / customerCount) : 0;
+
+    // Receipts by method of payment
+    const cashReceipts = transactions
+      .filter((t) => t.paymentMethod === 'cash')
+      .reduce((s, t) => s + (t.cashGiven || t.total), 0);
+    const cardReceipts = transactions
+      .filter((t) => t.paymentMethod === 'card')
+      .reduce((s, t) => s + t.total, 0);
+    const mobileReceipts = transactions
+      .filter((t) => t.paymentMethod === 'mobile')
+      .reduce((s, t) => s + t.total, 0);
+    const splitTransactions = transactions.filter(
+      (t) => t.paymentMethod === 'split' || t.paymentMethod === 'mixed',
+    );
+    const splitReceipts = splitTransactions.reduce((s, t) => s + t.total, 0);
+
+    // Change given (monnaie rendue)
+    const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
+
+    // Total receipts
+    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + splitReceipts;
+
+    // Cash drawer = opening cash + cash receipts - change given
+    const cashDrawerTotal = shift.openingCash + cashReceipts - changeGiven;
+
+    // Returns & credits
+    const returns = await this.prisma.transaction.aggregate({
+      where: {
+        registerId: shift.registerId,
+        date: { gte: startTime, lte: endTime },
+        status: 'refunded',
+      },
+      _sum: { total: true },
+    });
+
+    return {
+      shiftId: shift.id,
+      registerId: shift.registerId,
+      registerName: shift.registerName || shift.registerId,
+      employeeId: shift.employeeId,
+      employeeName: shift.employeeName || '',
+      openedAt: shift.openedAt,
+      closedAt: shift.closedAt,
+      openingCash: shift.openingCash,
+      closingCash: shift.closingCash,
+      expectedCash: shift.expectedCash,
+      difference: shift.difference,
+      notes: shift.notes,
+
+      grossSales,
+      returnsAndCredits: returns._sum.total || 0,
+      totalDiscount,
+      totalTax,
+      netSales,
+      nonTaxableSales: netSales - totalTax,
+
+      receiptsByMethod: {
+        cash: cashReceipts,
+        card: cardReceipts,
+        mobile: mobileReceipts,
+        split: splitReceipts,
+      },
+      totalReceipts,
+      changeGiven,
+      cashDrawerTotal,
+
+      customerCount,
+      averageSale,
+
+      transactions: transactions.map((t) => ({
+        id: t.id,
+        transactionNumber: t.transactionNumber,
+        date: t.date,
+        total: t.total,
+        paymentMethod: t.paymentMethod,
+      })),
     };
   }
 }
