@@ -84,7 +84,8 @@ export class ShiftsService {
     const endTime = shift.closedAt || new Date();
 
     // Toutes les transactions de cette caisse pendant le shift
-    const transactions = await this.prisma.transaction.findMany({
+    // D'abord par registerId, sinon par cashierId (fallback pour anciennes transactions)
+    let transactions = await this.prisma.transaction.findMany({
       where: {
         registerId: shift.registerId,
         date: { gte: startTime, lte: endTime },
@@ -105,6 +106,32 @@ export class ShiftsService {
       },
       orderBy: { date: 'asc' },
     });
+
+    // Fallback: si aucune transaction trouvée par registerId,
+    // chercher par cashierId (l'employé du shift) dans la période
+    if (transactions.length === 0) {
+      transactions = await this.prisma.transaction.findMany({
+        where: {
+          cashierId: shift.employeeId,
+          date: { gte: startTime, lte: endTime },
+          status: 'completed',
+        },
+        select: {
+          id: true,
+          transactionNumber: true,
+          date: true,
+          subtotal: true,
+          discount: true,
+          tax: true,
+          total: true,
+          paymentMethod: true,
+          cashGiven: true,
+          change: true,
+          cashierId: true,
+        },
+        orderBy: { date: 'asc' },
+      });
+    }
 
     // Agrégations
     const grossSales = transactions.reduce((s, t) => s + t.subtotal, 0);
