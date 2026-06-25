@@ -32,7 +32,7 @@ export class SyncService implements OnModuleInit {
       console.log(`🔄 Sync activé - intervalle: ${interval / 1000}s`);
       console.log(`☁️  Cloud API: ${this.cloudApiUrl || 'non configuré'}`);
     } else {
-      console.log('🔄 Sync désactivé (mode développement)');
+      console.log('🔄 Sync désactivé');
     }
   }
 
