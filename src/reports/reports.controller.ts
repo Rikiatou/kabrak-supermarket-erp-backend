@@ -98,4 +98,13 @@ export class ReportsController {
   getInventoryValuation() {
     return this.reportsService.getInventoryValuation();
   }
+
+  @Get('discounts')
+  getDiscountsReport(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const { start, end } = this.parseDates(startDate, endDate);
+    return this.reportsService.getDiscountsReport(start, end);
+  }
 }

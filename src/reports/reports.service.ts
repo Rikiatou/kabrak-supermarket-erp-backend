@@ -251,6 +251,80 @@ export class ReportsService {
     };
   }
 
+  // Rapport des réductions (transactions avec discount > 0)
+  async getDiscountsReport(startDate: Date, endDate: Date) {
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        date: { gte: startDate, lte: endDate },
+        status: 'completed',
+        discount: { gt: 0 },
+      },
+      include: {
+        cashier: {
+          select: { firstName: true, lastName: true },
+        },
+        items: {
+          include: {
+            product: { select: { name: true, sku: true } },
+          },
+        },
+      },
+      orderBy: { date: 'desc' },
+    });
+
+    // Agrégation par produit
+    const productDiscountMap = new Map<
+      string,
+      { productName: string; sku: string; totalDiscount: number; occurrences: number }
+    >();
+
+    transactions.forEach((tx) => {
+      tx.items.forEach((item) => {
+        if (item.discount > 0) {
+          const name = item.product?.name || 'Inconnu';
+          const sku = item.product?.sku || '';
+          const key = item.productId;
+          const existing = productDiscountMap.get(key) || {
+            productName: name,
+            sku,
+            totalDiscount: 0,
+            occurrences: 0,
+          };
+          existing.totalDiscount += item.discount;
+          existing.occurrences += 1;
+          productDiscountMap.set(key, existing);
+        }
+      });
+    });
+
+    const totalDiscount = transactions.reduce((sum, tx) => sum + tx.discount, 0);
+
+    return {
+      totalDiscount,
+      transactionsCount: transactions.length,
+      transactions: transactions.map((tx) => ({
+        id: tx.id,
+        transactionNumber: tx.transactionNumber,
+        date: tx.date,
+        cashierName: `${tx.cashier.firstName} ${tx.cashier.lastName}`,
+        subtotal: tx.subtotal,
+        discount: tx.discount,
+        total: tx.total,
+        items: tx.items
+          .filter((i) => i.discount > 0)
+          .map((i) => ({
+            productName: i.product?.name || 'Inconnu',
+            sku: i.product?.sku || '',
+            quantity: i.quantity,
+            discount: i.discount,
+          })),
+      })),
+      byProduct: Array.from(productDiscountMap.values()).sort(
+        (a, b) => b.totalDiscount - a.totalDiscount,
+      ),
+    };
+  }
+
   // Ventes par jour
   async getSalesByDay(startDate: Date, endDate: Date) {
     const transactions = await this.prisma.transaction.findMany({
