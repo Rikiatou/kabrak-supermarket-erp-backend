@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -59,8 +59,8 @@ export class InvoicesController {
   }
 
   @Post()
-  create(@Body() dto: CreateInvoiceDto) {
-    return this.invoicesService.create(dto);
+  create(@Body() dto: CreateInvoiceDto, @Req() req: any) {
+    return this.invoicesService.create(dto, req.user?.id);
   }
 
   @Post(':id/payments')

@@ -58,7 +58,7 @@ export class PurchaseOrdersService {
     });
   }
 
-  async create(dto: CreatePurchaseOrderDto) {
+  async create(dto: CreatePurchaseOrderDto, createdBy?: string) {
     const year = new Date().getFullYear();
     const count = await this.prisma.purchaseOrder.count({
       where: {
@@ -96,7 +96,7 @@ export class PurchaseOrdersService {
     });
   }
 
-  async createAndReceive(dto: CreatePurchaseOrderDto, invoiceNumber?: string) {
+  async createAndReceive(dto: CreatePurchaseOrderDto, invoiceNumber?: string, createdBy?: string) {
     const year = new Date().getFullYear();
     const count = await this.prisma.purchaseOrder.count({
       where: {
@@ -155,6 +155,7 @@ export class PurchaseOrdersService {
             reason: 'purchase',
             reference: invoiceNumber || order.orderNumber,
             notes: `Réception achat ${order.orderNumber}${invoiceNumber ? ` — Facture: ${invoiceNumber}` : ''}`,
+            createdBy: createdBy || undefined,
           },
         });
       } catch (e) {
@@ -165,7 +166,7 @@ export class PurchaseOrdersService {
     return order;
   }
 
-  async updateStatus(id: string, status: string) {
+  async updateStatus(id: string, status: string, createdBy?: string) {
     if (status === 'received') {
       const order = await this.prisma.purchaseOrder.findUnique({
         where: { id },
@@ -194,6 +195,7 @@ export class PurchaseOrdersService {
               reason: 'purchase',
               reference: order.orderNumber,
               notes: `Réception commande ${order.orderNumber}`,
+              createdBy: createdBy || undefined,
             },
           });
         } catch (e) {

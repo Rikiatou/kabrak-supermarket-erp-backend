@@ -39,7 +39,7 @@ export class InvoicesService {
     return invoice;
   }
 
-  async create(dto: CreateInvoiceDto) {
+  async create(dto: CreateInvoiceDto, createdBy?: string) {
     const year = new Date().getFullYear();
     const count = await this.prisma.invoice.count({
       where: { number: { startsWith: `FAC-${year}-` } },
@@ -96,6 +96,7 @@ export class InvoicesService {
               reason: 'invoice',
               reference: number,
               notes: `Facture ${number}`,
+              createdBy: createdBy || undefined,
             },
           });
         } catch (e) {

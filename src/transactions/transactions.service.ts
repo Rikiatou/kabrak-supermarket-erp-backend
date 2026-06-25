@@ -79,6 +79,7 @@ export class TransactionsService {
             reason: 'sale',
             reference: tx.transactionNumber,
             notes: item.discount > 0 ? `Remise article: ${item.discount}` : undefined,
+            createdBy: createTransactionDto.cashierId,
             syncStatus: 'pending',
           },
         });
@@ -465,6 +466,7 @@ export class TransactionsService {
             quantity: item.quantity,
             reason: 'refund',
             reference: id,
+            createdBy: transaction.cashierId,
             syncStatus: 'pending',
           },
         });

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
 
@@ -7,8 +7,8 @@ export class StockController {
   constructor(private readonly stockService: StockService) {}
 
   @Post('movements')
-  createMovement(@Body() dto: CreateStockMovementDto) {
-    return this.stockService.createMovement(dto);
+  createMovement(@Body() dto: CreateStockMovementDto, @Req() req: any) {
+    return this.stockService.createMovement({ ...dto, createdBy: dto.createdBy || req.user?.id });
   }
 
   @Get('movements')
@@ -49,8 +49,9 @@ export class StockController {
     @Param('productId') productId: string,
     @Body('newStock') newStock: number,
     @Body('reason') reason: string,
+    @Req() req: any,
     @Body('createdBy') createdBy?: string,
   ) {
-    return this.stockService.adjustInventory(productId, newStock, reason, createdBy);
+    return this.stockService.adjustInventory(productId, newStock, reason, createdBy || req.user?.id);
   }
 }
