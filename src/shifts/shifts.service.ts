@@ -153,10 +153,10 @@ export class ShiftsService {
     const customerCount = transactions.length;
     const averageSale = customerCount > 0 ? Math.round(netSales / customerCount) : 0;
 
-    // Receipts by method of payment
+    // Receipts by method of payment (montant des ventes, pas cashGiven)
     const cashReceipts = transactions
       .filter((t) => t.paymentMethod === 'cash')
-      .reduce((s, t) => s + (t.cashGiven || t.total), 0);
+      .reduce((s, t) => s + t.total, 0);
     const cardReceipts = transactions
       .filter((t) => t.paymentMethod === 'card')
       .reduce((s, t) => s + t.total, 0);
@@ -168,14 +168,17 @@ export class ShiftsService {
     );
     const splitReceipts = splitTransactions.reduce((s, t) => s + t.total, 0);
 
-    // Change given (monnaie rendue)
+    // Cash physically received (cashGiven) and change given (monnaie rendue)
+    const cashReceived = transactions
+      .filter((t) => t.paymentMethod === 'cash')
+      .reduce((s, t) => s + (t.cashGiven || t.total), 0);
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
 
-    // Total receipts
+    // Total receipts = somme des ventes par méthode
     const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + splitReceipts;
 
-    // Cash drawer = opening cash + cash receipts - change given
-    const cashDrawerTotal = shift.openingCash + cashReceipts - changeGiven;
+    // Cash drawer = opening cash + cash physically received - change given
+    const cashDrawerTotal = shift.openingCash + cashReceived - changeGiven;
 
     // Returns & credits
     const returns = await this.prisma.transaction.aggregate({
@@ -216,6 +219,7 @@ export class ShiftsService {
       },
       totalReceipts,
       changeGiven,
+      cashReceived,
       cashDrawerTotal,
 
       customerCount,
