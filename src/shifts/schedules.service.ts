@@ -8,16 +8,16 @@ export class SchedulesService {
 
   // Créer un créneau de planning
   async create(dto: CreateScheduleDto) {
-    // Vérifier que l'employé existe et est un caissier/superviseur
+    // Vérifier que l'employé existe et est actif
     const employee = await this.prisma.employee.findUnique({
       where: { id: dto.employeeId },
     });
     if (!employee) {
       throw new NotFoundException(`Employé #${dto.employeeId} non trouvé`);
     }
-    if (!['cashier', 'supervisor', 'manager'].includes(employee.role)) {
+    if (employee.status === 'inactive') {
       throw new BadRequestException(
-        `Seuls les caissiers, superviseurs et managers peuvent être assignés à une caisse (rôle: ${employee.role})`,
+        `Cet employé est inactif et ne peut pas être assigné (statut: ${employee.status})`,
       );
     }
 
