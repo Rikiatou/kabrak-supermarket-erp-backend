@@ -180,6 +180,9 @@ export class ShiftsService {
     // Cash drawer = opening cash + cash physically received - change given
     const cashDrawerTotal = shift.openingCash + cashReceived - changeGiven;
 
+    // Total expected = opening cash + all sales - change given
+    const totalExpected = shift.openingCash + cashReceipts + cardReceipts + mobileReceipts + splitReceipts - changeGiven;
+
     // Returns & credits
     const returns = await this.prisma.transaction.aggregate({
       where: {
@@ -221,6 +224,7 @@ export class ShiftsService {
       changeGiven,
       cashReceived,
       cashDrawerTotal,
+      totalExpected,
 
       customerCount,
       averageSale,
