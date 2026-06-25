@@ -80,6 +80,18 @@ export class ShiftsService {
       throw new NotFoundException('Shift not found');
     }
 
+    // Si employeeName est null, récupérer le nom depuis l'employé
+    let employeeName = shift.employeeName || '';
+    if (!employeeName) {
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: shift.employeeId },
+        select: { firstName: true, lastName: true },
+      });
+      if (employee) {
+        employeeName = `${employee.firstName} ${employee.lastName}`;
+      }
+    }
+
     const startTime = shift.openedAt;
     const endTime = shift.closedAt || new Date();
 
@@ -180,7 +192,7 @@ export class ShiftsService {
       registerId: shift.registerId,
       registerName: shift.registerName || shift.registerId,
       employeeId: shift.employeeId,
-      employeeName: shift.employeeName || '',
+      employeeName,
       openedAt: shift.openedAt,
       closedAt: shift.closedAt,
       openingCash: shift.openingCash,
