@@ -66,13 +66,21 @@ export class CustomersService {
     const count = await this.prisma.customer.count();
     const customerNumber = `KAB-${String(count + 1).padStart(6, '0')}`;
 
+    // Vérifier si le téléphone existe déjà
+    const existing = await this.prisma.customer.findUnique({
+      where: { phone: dto.phone },
+    });
+    if (existing) {
+      return existing; // Retourner le client existant au lieu d'échouer
+    }
+
     return this.prisma.customer.create({
       data: {
         customerNumber,
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,
-        email: dto.email,
+        email: dto.email || null, // Convertir "" en null
       },
     });
   }
