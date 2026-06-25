@@ -2,10 +2,12 @@ import { IsString, IsInt, IsOptional, IsBoolean, IsNumber, Min } from 'class-val
 
 export class CreateProductDto {
   @IsString()
-  sku: string;
+  @IsOptional()
+  sku?: string;
 
   @IsString()
-  barcode: string;
+  @IsOptional()
+  barcode?: string;
 
   @IsString()
   name: string;

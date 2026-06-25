@@ -11,24 +11,36 @@ export class ProductsService {
 
   // Créer un produit
   async create(createProductDto: CreateProductDto) {
+    // Générer SKU et barcode automatiquement si non fournis
+    const count = await this.prisma.product.count();
+    const autoSku = `PRD-${String(count + 1).padStart(5, '0')}`;
+    const autoBarcode = `2${String(count + 1).padStart(12, '0')}`;
+
+    const sku = createProductDto.sku || autoSku;
+    const barcode = createProductDto.barcode || autoBarcode;
+
     // Vérifier si SKU ou barcode existe déjà
     const existing = await this.prisma.product.findFirst({
       where: {
         OR: [
-          { sku: createProductDto.sku },
-          { barcode: createProductDto.barcode },
+          { sku },
+          { barcode },
         ],
       },
     });
 
     if (existing) {
       throw new ConflictException(
-        `Produit avec SKU "${createProductDto.sku}" ou barcode "${createProductDto.barcode}" existe déjà`,
+        `Produit avec SKU "${sku}" ou barcode "${barcode}" existe déjà`,
       );
     }
 
     return this.prisma.product.create({
-      data: createProductDto,
+      data: {
+        ...createProductDto,
+        sku,
+        barcode,
+      },
       include: {
         supplier: true,
       },
