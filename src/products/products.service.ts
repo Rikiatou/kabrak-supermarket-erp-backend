@@ -176,6 +176,45 @@ export class ProductsService {
     return product;
   }
 
+  // Top produits vendus — pour cache local du POS au démarrage
+  async getBestsellers(limit: number = 200) {
+    // Récupérer les produits les plus vendus (par quantité totale vendue)
+    const topItems = await this.prisma.transactionItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: limit,
+    });
+
+    const productIds = topItems.map((t) => t.productId);
+
+    // Si pas assez de ventes, compléter avec des produits par stock
+    if (productIds.length < limit) {
+      const extra = await this.prisma.product.findMany({
+        where: {
+          isActive: true,
+          id: { notIn: productIds },
+        },
+        orderBy: { stock: 'desc' },
+        take: limit - productIds.length,
+        select: { id: true },
+      });
+      productIds.push(...extra.map((p) => p.id));
+    }
+
+    // Récupérer les produits complets
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      include: { supplier: true },
+    });
+
+    // Trier selon l'ordre des bestsellers
+    const orderMap = new Map(productIds.map((id, i) => [id, i]));
+    products.sort((a, b) => (orderMap.get(a.id) ?? 9999) - (orderMap.get(b.id) ?? 9999));
+
+    return { data: products, total: products.length };
+  }
+
   // Mettre à jour
   async update(id: string, updateProductDto: UpdateProductDto) {
     // Vérifier si existe

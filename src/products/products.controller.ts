@@ -36,6 +36,14 @@ export class ProductsController {
     return this.productsService.search(searchDto);
   }
 
+  // Top produits vendus (pour cache local du POS)
+  @Get('bestsellers')
+  getBestsellers(@Query('limit') limit?: string) {
+    return this.productsService.getBestsellers(
+      limit ? parseInt(limit) : 200,
+    );
+  }
+
   @Get('stats')
   getStats() {
     return this.productsService.getStats();
