@@ -105,14 +105,57 @@ export class PurchaseOrdersService {
     });
     const orderNumber = `BC-${year}-${String(count + 1).padStart(4, '0')}`;
 
-    const total = dto.items.reduce(
+    // Étape 1: Créer les nouveaux produits s'il y en a
+    const resolvedItems: Array<{ productId: string; quantity: number; unitCost: number }> = [];
+    for (const item of dto.items) {
+      if (item.isNewProduct && item.newProductName) {
+        try {
+          // Générer SKU et barcode auto si non fournis
+          const prodCount = await this.prisma.product.count();
+          const autoSku = item.newProductBarcode || `PRD-${String(prodCount + 1).padStart(5, '0')}`;
+          const newProduct = await this.prisma.product.create({
+            data: {
+              sku: autoSku,
+              barcode: item.newProductBarcode || autoSku,
+              name: item.newProductName,
+              category: item.newProductCategory || 'Grocery',
+              unit: item.newProductUnit || 'pc',
+              price: item.sellPrice || item.unitCost,
+              costPrice: item.unitCost,
+              taxRate: 0,
+              stock: 0, // Le stock sera incrémenté ci-dessous
+              minStock: 10,
+              isActive: true,
+              expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+              supplierId: dto.supplierId,
+            },
+          });
+          resolvedItems.push({
+            productId: newProduct.id,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+          });
+        } catch (e) {
+          console.error(`Failed to create new product ${item.newProductName}:`, e);
+          throw new Error(`Impossible de créer le produit: ${item.newProductName}`);
+        }
+      } else {
+        resolvedItems.push({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+        });
+      }
+    }
+
+    const total = resolvedItems.reduce(
       (sum, item) => sum + item.quantity * item.unitCost,
       0,
     );
 
     const notes = [dto.notes, invoiceNumber ? `Facture fournisseur: ${invoiceNumber}` : null].filter(Boolean).join(' | ');
 
-    // Create order and update stock (sequential — $transaction fails on Neon pooler)
+    // Étape 2: Créer la commande avec les items résolus
     const order = await this.prisma.purchaseOrder.create({
       data: {
         orderNumber,
@@ -123,7 +166,7 @@ export class PurchaseOrdersService {
         status: 'received',
         receivedDate: new Date(),
         items: {
-          create: dto.items.map((item) => ({
+          create: resolvedItems.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
             unitCost: item.unitCost,
@@ -138,12 +181,20 @@ export class PurchaseOrdersService {
       },
     });
 
-    for (const item of dto.items) {
+    // Étape 3: Mettre à jour le stock pour chaque article
+    for (const item of resolvedItems) {
       try {
         await this.prisma.product.update({
           where: { id: item.productId },
           data: {
             stock: { increment: item.quantity },
+            // Mettre à jour le prix de vente et la date d'expiration si fournis
+            ...(dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))?.sellPrice
+              ? { price: dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))!.sellPrice! }
+              : {}),
+            ...(dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))?.expiryDate
+              ? { expiryDate: new Date(dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))!.expiryDate!) }
+              : {}),
           },
         });
 

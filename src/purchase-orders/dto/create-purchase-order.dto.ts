@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePurchaseOrderItemDto {
@@ -10,6 +10,35 @@ export class CreatePurchaseOrderItemDto {
 
   @IsNumber()
   unitCost: number;
+
+  // Champs optionnels pour la création de produit depuis le bordereau
+  @IsBoolean()
+  @IsOptional()
+  isNewProduct?: boolean;
+
+  @IsString()
+  @IsOptional()
+  newProductName?: string;
+
+  @IsString()
+  @IsOptional()
+  newProductBarcode?: string;
+
+  @IsString()
+  @IsOptional()
+  newProductCategory?: string;
+
+  @IsString()
+  @IsOptional()
+  newProductUnit?: string;
+
+  @IsNumber()
+  @IsOptional()
+  sellPrice?: number;
+
+  @IsString()
+  @IsOptional()
+  expiryDate?: string;
 }
 
 export class CreatePurchaseOrderDto {
