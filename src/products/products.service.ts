@@ -260,11 +260,13 @@ export class ProductsService {
 
   // Alertes stock
   async getStockAlerts() {
-    return this.prisma.product.findMany({
+    // Prisma ne supporte pas la comparaison entre deux colonnes directement
+    // On récupère les produits et on filtre en mémoire
+    const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
         OR: [
-          { stock: { lte: this.prisma.product.fields.minStock } },
+          { stock: { lte: 10 } }, // Seuil minimum par défaut
           {
             expiryDate: {
               lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 jours
@@ -275,6 +277,9 @@ export class ProductsService {
       include: { supplier: true },
       orderBy: { stock: 'asc' },
     });
+    // Filtrer ceux où stock <= minStock
+    return products.filter((p) => p.stock <= p.minStock || 
+      (p.expiryDate && new Date(p.expiryDate) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)));
   }
 
   // Statistiques
@@ -284,7 +289,7 @@ export class ProductsService {
       this.prisma.product.count({
         where: {
           isActive: true,
-          stock: { lte: this.prisma.product.fields.minStock },
+          stock: { lte: 10 },
         },
       }),
       this.prisma.product.count({

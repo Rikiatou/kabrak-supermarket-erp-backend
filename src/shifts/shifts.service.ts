@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { OpenShiftDto } from './dto/open-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
@@ -21,6 +21,13 @@ export class ShiftsService {
   }
 
   async closeShift(id: string, dto: CloseShiftDto) {
+    const existing = await this.prisma.shift.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException(`Shift #${id} introuvable`);
+    }
+    if (existing.status === 'closed') {
+      throw new BadRequestException('Ce shift est déjà clôturé');
+    }
     const difference = dto.closingCash - dto.expectedCash;
 
     return this.prisma.shift.update({
@@ -119,9 +126,11 @@ export class ShiftsService {
       orderBy: { date: 'asc' },
     });
 
-    // Fallback: si aucune transaction trouvée par registerId,
-    // chercher par cashierId (l'employé du shift) dans la période
-    if (transactions.length === 0) {
+    // Fallback: si aucune transaction trouvée par registerId (par exemple si
+    // registerId était null dans les anciennes transactions), chercher par
+    // cashierId (l'employé du shift) dans la période — uniquement si le
+    // registerId du shift est null pour éviter de mélanger les caisses
+    if (transactions.length === 0 && !shift.registerId) {
       transactions = await this.prisma.transaction.findMany({
         where: {
           cashierId: shift.employeeId,

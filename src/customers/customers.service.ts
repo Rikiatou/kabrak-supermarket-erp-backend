@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 
@@ -101,6 +101,16 @@ export class CustomersService {
   }
 
   async redeemPoints(customerId: string, points: number) {
+    if (points <= 0) {
+      throw new BadRequestException('Le nombre de points doit être positif');
+    }
+    const existing = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!existing) {
+      throw new NotFoundException('Client introuvable');
+    }
+    if (existing.points < points) {
+      throw new BadRequestException('Points insuffisants');
+    }
     const customer = await this.prisma.customer.update({
       where: { id: customerId },
       data: {

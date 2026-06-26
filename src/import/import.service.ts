@@ -99,8 +99,8 @@ export class ImportService {
             throw new BadRequestException('name est obligatoire');
           }
 
-          const price = parseInt(data.price) || 0;
-          const costPrice = parseInt(data.costprice || data.cost_price || '0') || 0;
+          const price = parseFloat(data.price) || 0;
+          const costPrice = parseFloat(data.costprice || data.cost_price || '0') || 0;
           const stock = parseInt(data.stock) || 0;
           const minStock = parseInt(data.minstock || data.min_stock || '10') || 10;
 

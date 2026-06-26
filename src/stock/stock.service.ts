@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
 
@@ -123,6 +123,9 @@ export class StockService {
 
   // Ajustement d'inventaire
   async adjustInventory(productId: string, newStock: number, reason: string, createdBy?: string) {
+    if (newStock < 0) {
+      throw new BadRequestException('Le stock ne peut pas être négatif');
+    }
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });

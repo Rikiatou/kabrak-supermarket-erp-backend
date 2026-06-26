@@ -60,6 +60,7 @@ export class TransactionsService {
     });
 
     // 2. Mettre à jour le stock pour chaque article
+    const stockErrors: string[] = [];
     for (const item of createTransactionDto.items) {
       try {
         await this.prisma.product.update({
@@ -85,10 +86,12 @@ export class TransactionsService {
         });
       } catch (e) {
         console.error(`Stock update failed for product ${item.productId}:`, e);
+        stockErrors.push(item.productId);
       }
     }
 
     // 3. Mettre à jour les points fidélité si client
+    let loyaltyError = false;
     if (createTransactionDto.customerId) {
       try {
         const pointsEarned = Math.floor(createTransactionDto.total / 100);
@@ -110,10 +113,16 @@ export class TransactionsService {
         });
       } catch (e) {
         console.error(`Loyalty update failed for customer ${createTransactionDto.customerId}:`, e);
+        loyaltyError = true;
       }
     }
 
     const transaction = tx;
+    // Attacher les avertissements pour que le frontend puisse les afficher
+    (transaction as any)._warnings = {
+      stockErrors,
+      loyaltyError,
+    };
 
     return transaction;
   }
