@@ -27,7 +27,7 @@ export class ImportService {
       .split(separator)
       .map((h) => h.trim().toLowerCase().replace(/"/g, ''));
 
-    const requiredHeaders = ['sku', 'barcode', 'name', 'category', 'price', 'stock'];
+    const requiredHeaders = ['name', 'category', 'price', 'stock'];
     const missing = requiredHeaders.filter((h) => !headers.includes(h));
     if (missing.length > 0) {
       throw new BadRequestException(
@@ -95,8 +95,8 @@ export class ImportService {
       for (const { rowIndex, data } of batch) {
         try {
           // Validation
-          if (!data.sku || !data.barcode || !data.name) {
-            throw new BadRequestException('SKU, barcode et name sont obligatoires');
+          if (!data.name) {
+            throw new BadRequestException('name est obligatoire');
           }
 
           const price = parseInt(data.price) || 0;
@@ -108,9 +108,13 @@ export class ImportService {
             throw new BadRequestException('Prix et stock doivent être positifs');
           }
 
+          // Auto-générer SKU et barcode si manquants
+          const sku = data.sku || `PRD-${String(rowIndex).padStart(5, '0')}`;
+          const barcode = data.barcode || `2000000000${String(rowIndex).padStart(3, '0')}`;
+
           productsToCreate.push({
-            sku: data.sku,
-            barcode: data.barcode,
+            sku,
+            barcode,
             name: data.name,
             description: data.description || null,
             category: data.category || 'Divers',
