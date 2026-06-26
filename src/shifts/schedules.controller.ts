@@ -21,6 +21,12 @@ export class SchedulesController {
     return this.schedulesService.findAll();
   }
 
+  // Lister toutes les caisses actives
+  @Get('registers')
+  getRegisters() {
+    return this.schedulesService.getRegisters();
+  }
+
   // Planning d'aujourd'hui (qui est censé être où maintenant)
   @Get('today')
   getToday() {

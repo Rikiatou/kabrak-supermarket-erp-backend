@@ -64,20 +64,38 @@ export class SchedulesService {
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
 
+    // Récupérer les caisses pour mapper registerId → nom
+    const registers = await this.prisma.cashRegister.findMany();
+    const registerMap = new Map(registers.map((r) => [r.id, r.name]));
+
+    // Enrichir chaque schedule avec le nom de la caisse
+    const enriched = schedules.map((s) => ({
+      ...s,
+      registerName: registerMap.get(s.registerId) || s.registerId,
+    }));
+
     // Grouper par jour pour faciliter l'affichage frontend
-    const byDay: Record<number, typeof schedules> = {};
+    const byDay: Record<number, typeof enriched> = {};
     for (let i = 0; i <= 6; i++) {
       byDay[i] = [];
     }
-    schedules.forEach((s) => {
+    enriched.forEach((s) => {
       byDay[s.dayOfWeek].push(s);
     });
 
     return {
-      all: schedules,
+      all: enriched,
       byDay,
-      total: schedules.length,
+      total: enriched.length,
     };
+  }
+
+  // Lister toutes les caisses pour le planning
+  async getRegisters() {
+    return this.prisma.cashRegister.findMany({
+      where: { isActive: true },
+      orderBy: { code: 'asc' },
+    });
   }
 
   // Planning d'un employé spécifique
