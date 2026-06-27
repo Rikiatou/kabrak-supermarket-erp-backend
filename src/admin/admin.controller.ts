@@ -8,6 +8,7 @@ import {
   Headers,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { Public } from '../auth/public.decorator';
 import { LicensesService } from '../licenses/licenses.service';
@@ -200,5 +201,99 @@ export class AdminController {
     this.checkAdminToken(token);
     const result = await this.licensesService.cancel(licenseKey);
     return { success: true, data: result, message: 'Licence annulée' };
+  }
+
+  // ========================================
+  // BACKUP - RECEVOIR UN BACKUP D'UN CLIENT
+  // ========================================
+
+  @Public()
+  @Post('backup')
+  async receiveBackup(
+    @Headers('x-admin-token') token: string,
+    @Body() body: { timestamp: string; database: string; dump: string; size: number },
+  ) {
+    this.checkAdminToken(token);
+
+    if (!body.dump) {
+      throw new BadRequestException('Aucun dump fourni');
+    }
+
+    try {
+      // Sauvegarder le dump dans le dossier backups du backend
+      const fs = require('fs');
+      const path = require('path');
+      const backupDir = path.join(process.cwd(), 'backups');
+
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      const filename = `client-backup-${body.timestamp}.sql`;
+      const filepath = path.join(backupDir, filename);
+
+      fs.writeFileSync(filepath, body.dump, 'utf-8');
+
+      // Nettoyer les backups de plus de 30 jours
+      const files = fs.readdirSync(backupDir)
+        .filter((f: string) => f.startsWith('client-backup-') && f.endsWith('.sql'))
+        .map((f: string) => ({
+          name: f,
+          mtime: fs.statSync(path.join(backupDir, f)).mtime,
+        }))
+        .sort((a: any, b: any) => b.mtime.getTime() - a.mtime.getTime());
+
+      if (files.length > 30) {
+        files.slice(30).forEach((f: any) => {
+          fs.unlinkSync(path.join(backupDir, f.name));
+        });
+      }
+
+      return {
+        success: true,
+        message: 'Backup reçu et sauvegardé',
+        filename,
+        size: body.size,
+      };
+    } catch (e) {
+      throw new InternalServerErrorException(`Erreur sauvegarde backup: ${e.message}`);
+    }
+  }
+
+  // ========================================
+  // BACKUP - LISTER LES BACKUPS
+  // ========================================
+
+  @Public()
+  @Get('backups')
+  async listBackups(@Headers('x-admin-token') token: string) {
+    this.checkAdminToken(token);
+
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const backupDir = path.join(process.cwd(), 'backups');
+
+      if (!fs.existsSync(backupDir)) {
+        return { success: true, data: [] };
+      }
+
+      const files = fs.readdirSync(backupDir)
+        .filter((f: string) => f.endsWith('.sql'))
+        .map((f: string) => {
+          const stat = fs.statSync(path.join(backupDir, f));
+          return {
+            filename: f,
+            size: stat.size,
+            sizeKB: Math.round(stat.size / 1024),
+            date: stat.mtime,
+          };
+        })
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      return { success: true, data: files };
+    } catch (e) {
+      throw new InternalServerErrorException(`Erreur liste backups: ${e.message}`);
+    }
   }
 }
