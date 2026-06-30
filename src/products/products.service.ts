@@ -48,10 +48,16 @@ export class ProductsService {
     });
   }
 
+  // Filtre tenant: produits du client OU produits sans licenseKey (catalogue global)
+  private tenantFilter(licenseKey?: string) {
+    if (!licenseKey) return {};
+    return { OR: [{ licenseKey }, { licenseKey: null }] };
+  }
+
   // Liste paginée
   async findAll(page: number = 1, limit: number = 100, licenseKey?: string) {
     const skip = (page - 1) * limit;
-    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const tenantFilter = this.tenantFilter(licenseKey);
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -81,12 +87,12 @@ export class ProductsService {
   async search(searchDto: SearchProductDto, licenseKey?: string) {
     const { q, category, barcode, sku, page = 1, limit = 100 } = searchDto;
     const skip = (page - 1) * limit;
-    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const tenantFilter = this.tenantFilter(licenseKey);
 
     // Recherche par barcode exact (scan caisse)
     if (barcode) {
       const product = await this.prisma.product.findFirst({
-        where: { barcode, ...tenantFilter },
+        where: { barcode, AND: licenseKey ? [{ OR: [{ licenseKey }, { licenseKey: null }] }] : [] },
         include: { supplier: true },
       });
       return {
@@ -98,7 +104,7 @@ export class ProductsService {
     // Recherche par SKU exact
     if (sku) {
       const product = await this.prisma.product.findFirst({
-        where: { sku, ...tenantFilter },
+        where: { sku, AND: licenseKey ? [{ OR: [{ licenseKey }, { licenseKey: null }] }] : [] },
         include: { supplier: true },
       });
       return {
@@ -107,21 +113,21 @@ export class ProductsService {
       };
     }
 
-    // Recherche multi-critères
-    const where: any = { isActive: true, ...tenantFilter };
-
-    if (category) {
-      where.category = category;
-    }
-
+    // Recherche multi-critères — combiner tenant filter ET text search avec AND
+    const andConditions: any[] = [{ isActive: true }];
+    if (licenseKey) andConditions.push({ OR: [{ licenseKey }, { licenseKey: null }] });
+    if (category) andConditions.push({ category });
     if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { sku: { contains: q, mode: 'insensitive' } },
-        { barcode: { contains: q } },
-        { description: { contains: q, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { sku: { contains: q, mode: 'insensitive' } },
+          { barcode: { contains: q } },
+          { description: { contains: q, mode: 'insensitive' } },
+        ],
+      });
     }
+    const where: any = { AND: andConditions };
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -263,7 +269,7 @@ export class ProductsService {
 
   // Alertes stock
   async getStockAlerts(licenseKey?: string) {
-    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const tenantFilter = this.tenantFilter(licenseKey);
     // Prisma ne supporte pas la comparaison entre deux colonnes directement
     // On récupère les produits et on filtre en mémoire
     const products = await this.prisma.product.findMany({
@@ -289,7 +295,7 @@ export class ProductsService {
 
   // Statistiques
   async getStats(licenseKey?: string) {
-    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const tenantFilter = this.tenantFilter(licenseKey);
     const [total, lowStock, expiring, outOfStock] = await Promise.all([
       this.prisma.product.count({ where: { isActive: true, ...tenantFilter } }),
       this.prisma.product.count({
@@ -378,7 +384,7 @@ export class ProductsService {
   async getMarkdowns(page: number = 1, limit: number = 50, licenseKey?: string) {
     const skip = (page - 1) * limit;
     const now = new Date();
-    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const tenantFilter = this.tenantFilter(licenseKey);
 
     const where = {
       isActive: true,
