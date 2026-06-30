@@ -1,0 +1,12 @@
+SELECT 'products' as t, COUNT(*) as c FROM "Product"
+UNION ALL SELECT 'transactions', COUNT(*) FROM "Transaction"
+UNION ALL SELECT 'stockMovements', COUNT(*) FROM "StockMovement"
+UNION ALL SELECT 'invoices', COUNT(*) FROM "Invoice"
+UNION ALL SELECT 'customers', COUNT(*) FROM "Customer"
+UNION ALL SELECT 'suppliers', COUNT(*) FROM "Supplier"
+UNION ALL SELECT 'employees', COUNT(*) FROM "Employee"
+UNION ALL SELECT 'cashRegisters', COUNT(*) FROM "CashRegister"
+UNION ALL SELECT 'shifts', COUNT(*) FROM "Shift"
+UNION ALL SELECT 'gifts', COUNT(*) FROM "Gift"
+UNION ALL SELECT 'losses', COUNT(*) FROM "Loss"
+UNION ALL SELECT 'users', COUNT(*) FROM "User";

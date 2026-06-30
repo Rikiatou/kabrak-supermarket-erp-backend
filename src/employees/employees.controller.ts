@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { EmployeesService } from './employees.service';
 
 @Controller('employees')
@@ -6,8 +7,8 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Get()
-  findAll() {
-    return this.employeesService.findAll();
+  findAll(@Req() req: Request & { licenseKey?: string }) {
+    return this.employeesService.findAll(true, req.licenseKey);
   }
 
   @Get('stats')
@@ -21,8 +22,8 @@ export class EmployeesController {
   }
 
   @Post()
-  create(@Body() data: any) {
-    return this.employeesService.create(data);
+  create(@Body() data: any, @Req() req: Request & { licenseKey?: string }) {
+    return this.employeesService.create(data, req.licenseKey);
   }
 
   @Patch(':id')

@@ -53,7 +53,8 @@ model Product {
   // Métadonnées
   imageUrl    String?
   isActive    Boolean  @default(true)
-  
+  licenseKey  String?  // Multi-tenant isolation
+
   // Relations
   transactionItems TransactionItem[]
   stockMovements   StockMovement[]
@@ -70,6 +71,7 @@ model Product {
   @@index([isActive])                   // Produits actifs seulement
   @@index([supplierId])                 // Produits par fournisseur
   @@index([markdownPrice])              // Produits en markdown actif
+  @@index([licenseKey])                 // Multi-tenant isolation
   
   @@map("products")
 }
@@ -87,6 +89,7 @@ model Supplier {
   paymentTerms  String   @default("30 jours")
   rating        Float    @default(0)
   isActive      Boolean  @default(true)
+  licenseKey    String?  // Multi-tenant isolation
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -95,6 +98,7 @@ model Supplier {
   
   @@index([name])
   @@index([isActive])
+  @@index([licenseKey])
   
   @@map("suppliers")
 }
@@ -137,7 +141,8 @@ model Transaction {
   syncStatus    String   @default("pending") // "pending", "synced", "failed"
   syncedAt      DateTime?
   syncError     String?
-  
+  licenseKey    String?  // Multi-tenant isolation
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -150,6 +155,7 @@ model Transaction {
   @@index([syncStatus])           // CRITIQUE pour offline-first
   @@index([transactionNumber])
   @@index([customerId])
+  @@index([licenseKey])           // Multi-tenant isolation
   
   @@map("transactions")
 }
@@ -254,7 +260,8 @@ model Employee {
   
   // Auth (simple pour commencer)
   pin           String?  // PIN 4 chiffres pour login caisse
-  
+  licenseKey    String?  // Multi-tenant isolation
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -265,6 +272,7 @@ model Employee {
   @@index([employeeNumber])
   @@index([role])
   @@index([status])
+  @@index([licenseKey])
   
   @@map("employees")
 }
@@ -291,13 +299,15 @@ model StockMovement {
   // Synchronisation
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  
+  licenseKey  String?  // Multi-tenant isolation
+
   createdAt   DateTime @default(now())
   
   @@index([productId])
   @@index([type])
   @@index([createdAt])
   @@index([syncStatus])
+  @@index([licenseKey])
   
   @@map("stock_movements")
 }
@@ -320,7 +330,8 @@ model PurchaseOrder {
   status       String   @default("draft") // "draft", "sent", "received", "cancelled"
   
   notes        String?
-  
+  licenseKey   String?  // Multi-tenant isolation
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
@@ -330,6 +341,7 @@ model PurchaseOrder {
   @@index([status])
   @@index([date])
   @@index([orderNumber])
+  @@index([licenseKey])
   
   @@map("purchase_orders")
 }
@@ -372,7 +384,8 @@ model Customer {
   tier        String   @default("bronze") // "bronze", "silver", "gold", "platinum"
   
   isActive    Boolean  @default(true)
-  
+  licenseKey  String?  // Multi-tenant isolation
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -383,6 +396,7 @@ model Customer {
   @@index([phone])
   @@index([customerNumber])
   @@index([tier])
+  @@index([licenseKey])
   
   @@map("customers")
 }
@@ -443,10 +457,12 @@ model Expense {
   paymentMethod String @default("cash")
   supplier    String?
   status      String   @default("paid") // "paid", "pending"
+  licenseKey  String?  // Multi-tenant isolation
   createdAt   DateTime @default(now())
   
   @@index([date])
   @@index([category])
+  @@index([licenseKey])
   @@map("expenses")
 }
 
@@ -500,7 +516,8 @@ model Invoice {
   paymentMethod String? // "cash", "card", "mobile", "transfer"
   
   notes       String?
-  
+  licenseKey  String?  // Multi-tenant isolation
+
   items       InvoiceItem[]
   payments    InvoicePayment[]
   
@@ -512,6 +529,7 @@ model Invoice {
   @@index([date])
   @@index([customerId])
   @@index([clientName])
+  @@index([licenseKey])
   
   @@map("invoices")
 }

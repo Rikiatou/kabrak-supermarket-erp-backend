@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { SuppliersService } from './suppliers.service';
 
 @Controller('suppliers')
@@ -6,8 +7,8 @@ export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 
   @Get()
-  findAll() {
-    return this.suppliersService.findAll();
+  findAll(@Req() req: Request & { licenseKey?: string }) {
+    return this.suppliersService.findAll(true, req.licenseKey);
   }
 
   @Get(':id')
@@ -16,8 +17,8 @@ export class SuppliersController {
   }
 
   @Post()
-  create(@Body() data: any) {
-    return this.suppliersService.create(data);
+  create(@Body() data: any, @Req() req: Request & { licenseKey?: string }) {
+    return this.suppliersService.create(data, req.licenseKey);
   }
 
   @Patch(':id')

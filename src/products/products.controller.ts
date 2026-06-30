@@ -7,7 +7,9 @@ import {
   Param,
   Delete,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -19,21 +21,26 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  create(@Body() createProductDto: CreateProductDto, @Req() req: Request & { licenseKey?: string }) {
+    return this.productsService.create(createProductDto, req.licenseKey);
   }
 
   @Get()
-  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Req() req?: Request & { licenseKey?: string },
+  ) {
     return this.productsService.findAll(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 100,
+      req?.licenseKey,
     );
   }
 
   @Get('search')
-  search(@Query() searchDto: SearchProductDto) {
-    return this.productsService.search(searchDto);
+  search(@Query() searchDto: SearchProductDto, @Req() req: Request & { licenseKey?: string }) {
+    return this.productsService.search(searchDto, req.licenseKey);
   }
 
   // Top produits vendus (pour cache local du POS)
@@ -45,20 +52,25 @@ export class ProductsController {
   }
 
   @Get('stats')
-  getStats() {
-    return this.productsService.getStats();
+  getStats(@Req() req: Request & { licenseKey?: string }) {
+    return this.productsService.getStats(req.licenseKey);
   }
 
   @Get('alerts')
-  getAlerts() {
-    return this.productsService.getStockAlerts();
+  getAlerts(@Req() req: Request & { licenseKey?: string }) {
+    return this.productsService.getStockAlerts(req.licenseKey);
   }
 
   @Get('markdowns')
-  getMarkdowns(@Query('page') page?: string, @Query('limit') limit?: string) {
+  getMarkdowns(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Req() req?: Request & { licenseKey?: string },
+  ) {
     return this.productsService.getMarkdowns(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
+      req?.licenseKey,
     );
   }
 

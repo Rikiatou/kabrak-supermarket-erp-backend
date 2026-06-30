@@ -16,7 +16,7 @@ export class AuthService {
   constructor(private prisma: PrismaService) {}
 
   // Login par numéro employé + PIN
-  async login(loginDto: LoginDto): Promise<{ user: AuthUser; token: string }> {
+  async login(loginDto: LoginDto, licenseKey?: string): Promise<{ user: AuthUser; token: string }> {
     const employee = await this.prisma.employee.findUnique({
       where: { employeeNumber: loginDto.employeeNumber },
     });
@@ -31,6 +31,11 @@ export class AuthService {
 
     if (!employee.pin || employee.pin !== loginDto.pin) {
       throw new UnauthorizedException('PIN incorrect');
+    }
+
+    // Multi-tenant: si l'employé a une licenseKey, elle doit correspondre à la requête
+    if (employee.licenseKey && licenseKey && employee.licenseKey !== licenseKey) {
+      throw new UnauthorizedException('Accès non autorisé pour cette licence');
     }
 
     const user: AuthUser = {
@@ -78,11 +83,12 @@ export class AuthService {
   }
 
   // Lister les employés (pour l'écran de login - sélection caissier)
-  async listCashiers() {
+  async listCashiers(licenseKey?: string) {
     return this.prisma.employee.findMany({
       where: {
         status: 'active',
         role: { in: ['cashier', 'boss', 'accountant', 'stockist'] },
+        ...(licenseKey ? { licenseKey } : {}),
       },
       select: {
         id: true,

@@ -5,9 +5,11 @@ import { PrismaService } from '../database/prisma.service';
 export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(activeOnly: boolean = true) {
+  async findAll(activeOnly: boolean = true, licenseKey?: string) {
+    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const baseWhere = activeOnly ? { status: { not: 'inactive' } } : {};
     return this.prisma.employee.findMany({
-      where: activeOnly ? { status: { not: 'inactive' } } : {},
+      where: { ...baseWhere, ...tenantFilter },
       select: {
         id: true,
         employeeNumber: true,
@@ -53,8 +55,10 @@ export class EmployeesService {
     });
   }
 
-  async create(data: any) {
-    return this.prisma.employee.create({ data });
+  async create(data: any, licenseKey?: string) {
+    return this.prisma.employee.create({
+      data: { ...data, ...(licenseKey ? { licenseKey } : {}) },
+    });
   }
 
   async update(id: string, data: any) {

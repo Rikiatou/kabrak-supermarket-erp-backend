@@ -10,7 +10,7 @@ export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
   // Créer un produit
-  async create(createProductDto: CreateProductDto) {
+  async create(createProductDto: CreateProductDto, licenseKey?: string) {
     // Générer SKU et barcode automatiquement si non fournis
     const count = await this.prisma.product.count();
     const autoSku = `PRD-${String(count + 1).padStart(5, '0')}`;
@@ -40,6 +40,7 @@ export class ProductsService {
         ...createProductDto,
         sku,
         barcode,
+        ...(licenseKey ? { licenseKey } : {}),
       },
       include: {
         supplier: true,
@@ -48,20 +49,21 @@ export class ProductsService {
   }
 
   // Liste paginée
-  async findAll(page: number = 1, limit: number = 100) {
+  async findAll(page: number = 1, limit: number = 100, licenseKey?: string) {
     const skip = (page - 1) * limit;
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
         skip,
         take: limit,
-        where: { isActive: true },
+        where: { isActive: true, ...tenantFilter },
         include: {
           supplier: true,
         },
         orderBy: { name: 'asc' },
       }),
-      this.prisma.product.count({ where: { isActive: true } }),
+      this.prisma.product.count({ where: { isActive: true, ...tenantFilter } }),
     ]);
 
     return {
@@ -76,14 +78,15 @@ export class ProductsService {
   }
 
   // Recherche ultra-rapide (pour caisse)
-  async search(searchDto: SearchProductDto) {
+  async search(searchDto: SearchProductDto, licenseKey?: string) {
     const { q, category, barcode, sku, page = 1, limit = 100 } = searchDto;
     const skip = (page - 1) * limit;
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     // Recherche par barcode exact (scan caisse)
     if (barcode) {
-      const product = await this.prisma.product.findUnique({
-        where: { barcode },
+      const product = await this.prisma.product.findFirst({
+        where: { barcode, ...tenantFilter },
         include: { supplier: true },
       });
       return {
@@ -94,8 +97,8 @@ export class ProductsService {
 
     // Recherche par SKU exact
     if (sku) {
-      const product = await this.prisma.product.findUnique({
-        where: { sku },
+      const product = await this.prisma.product.findFirst({
+        where: { sku, ...tenantFilter },
         include: { supplier: true },
       });
       return {
@@ -105,7 +108,7 @@ export class ProductsService {
     }
 
     // Recherche multi-critères
-    const where: any = { isActive: true };
+    const where: any = { isActive: true, ...tenantFilter };
 
     if (category) {
       where.category = category;
@@ -259,12 +262,14 @@ export class ProductsService {
   }
 
   // Alertes stock
-  async getStockAlerts() {
+  async getStockAlerts(licenseKey?: string) {
+    const tenantFilter = licenseKey ? { licenseKey } : {};
     // Prisma ne supporte pas la comparaison entre deux colonnes directement
     // On récupère les produits et on filtre en mémoire
     const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
+        ...tenantFilter,
         OR: [
           { stock: { lte: 10 } }, // Seuil minimum par défaut
           {
@@ -283,13 +288,15 @@ export class ProductsService {
   }
 
   // Statistiques
-  async getStats() {
+  async getStats(licenseKey?: string) {
+    const tenantFilter = licenseKey ? { licenseKey } : {};
     const [total, lowStock, expiring, outOfStock] = await Promise.all([
-      this.prisma.product.count({ where: { isActive: true } }),
+      this.prisma.product.count({ where: { isActive: true, ...tenantFilter } }),
       this.prisma.product.count({
         where: {
           isActive: true,
           stock: { lte: 10 },
+          ...tenantFilter,
         },
       }),
       this.prisma.product.count({
@@ -298,10 +305,11 @@ export class ProductsService {
           expiryDate: {
             lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           },
+          ...tenantFilter,
         },
       }),
       this.prisma.product.count({
-        where: { isActive: true, stock: 0 },
+        where: { isActive: true, stock: 0, ...tenantFilter },
       }),
     ]);
 
@@ -367,13 +375,15 @@ export class ProductsService {
   }
 
   // Lister tous les produits en markdown actif
-  async getMarkdowns(page: number = 1, limit: number = 50) {
+  async getMarkdowns(page: number = 1, limit: number = 50, licenseKey?: string) {
     const skip = (page - 1) * limit;
     const now = new Date();
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const where = {
       isActive: true,
       markdownPrice: { not: null },
+      ...tenantFilter,
       // Exclure les markdowns expirés (si markdownExpiresAt est dans le passé)
       OR: [
         { markdownExpiresAt: null },

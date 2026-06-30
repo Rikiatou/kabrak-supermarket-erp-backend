@@ -5,9 +5,11 @@ import { PrismaService } from '../database/prisma.service';
 export class SuppliersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(activeOnly: boolean = true) {
+  async findAll(activeOnly: boolean = true, licenseKey?: string) {
+    const tenantFilter = licenseKey ? { licenseKey } : {};
+    const baseWhere = activeOnly ? { isActive: true } : {};
     return this.prisma.supplier.findMany({
-      where: activeOnly ? { isActive: true } : {},
+      where: { ...baseWhere, ...tenantFilter },
       include: {
         _count: {
           select: { products: true, purchaseOrders: true },
@@ -39,15 +41,20 @@ export class SuppliersService {
     });
   }
 
-  async create(data: {
-    name: string;
-    contact: string;
-    phone: string;
-    email?: string;
-    address?: string;
-    paymentTerms?: string;
-  }) {
-    return this.prisma.supplier.create({ data });
+  async create(
+    data: {
+      name: string;
+      contact: string;
+      phone: string;
+      email?: string;
+      address?: string;
+      paymentTerms?: string;
+    },
+    licenseKey?: string,
+  ) {
+    return this.prisma.supplier.create({
+      data: { ...data, ...(licenseKey ? { licenseKey } : {}) },
+    });
   }
 
   async update(id: string, data: any) {

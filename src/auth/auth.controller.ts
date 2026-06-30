@@ -23,8 +23,10 @@ export class AuthController {
     // Vérifier si verrouillé
     this.rateLimiter.checkLocked(rateKey);
 
+    const licenseKey = (req.headers['x-license-key'] as string) || undefined;
+
     try {
-      const result = await this.authService.login(loginDto);
+      const result = await this.authService.login(loginDto, licenseKey);
       // Succès → reset
       this.rateLimiter.reset(rateKey);
       return result;
@@ -46,8 +48,9 @@ export class AuthController {
   // Lister les caissiers (pour l'écran de sélection) — public
   @Public()
   @Get('cashiers')
-  async listCashiers() {
-    return this.authService.listCashiers();
+  async listCashiers(@Req() req: Request) {
+    const licenseKey = (req.headers['x-license-key'] as string) || undefined;
+    return this.authService.listCashiers(licenseKey);
   }
 
   // Obtenir le statut de rate limiting pour un numéro employé

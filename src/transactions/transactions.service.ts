@@ -8,7 +8,7 @@ export class TransactionsService {
 
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
-  async create(createTransactionDto: CreateTransactionDto) {
+  async create(createTransactionDto: CreateTransactionDto, licenseKey?: string) {
     // Générer numéro de transaction
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
@@ -38,6 +38,7 @@ export class TransactionsService {
         customerId: createTransactionDto.customerId,
         status: 'completed',
         syncStatus: 'pending',
+        ...(licenseKey ? { licenseKey } : {}),
         items: {
           create: createTransactionDto.items.map((item) => ({
             productId: item.productId,
@@ -128,12 +129,15 @@ export class TransactionsService {
   }
 
   // Liste paginée
-  async findAll(page: number = 1, limit: number = 50, cashierId?: string) {
+  async findAll(page: number = 1, limit: number = 50, cashierId?: string, licenseKey?: string) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
     if (cashierId) {
       where.cashierId = cashierId;
+    }
+    if (licenseKey) {
+      where.licenseKey = licenseKey;
     }
 
     const [transactions, total] = await Promise.all([
@@ -210,21 +214,24 @@ export class TransactionsService {
   }
 
   // Statistiques du jour
-  async getTodayStats() {
+  async getTodayStats(licenseKey?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const [transactions, totalRevenue, totalItems] = await Promise.all([
       this.prisma.transaction.count({
         where: {
           date: { gte: today },
           status: 'completed',
+          ...tenantFilter,
         },
       }),
       this.prisma.transaction.aggregate({
         where: {
           date: { gte: today },
           status: 'completed',
+          ...tenantFilter,
         },
         _sum: { total: true },
       }),
@@ -233,6 +240,7 @@ export class TransactionsService {
           transaction: {
             date: { gte: today },
             status: 'completed',
+            ...tenantFilter,
           },
         },
         _sum: { quantity: true },
@@ -250,24 +258,27 @@ export class TransactionsService {
   }
 
   // Stats d'hier (pour comparaison dashboard)
-  async getYesterdayStats() {
+  async getYesterdayStats(licenseKey?: string) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const [transactions, totalRevenue, totalItems] = await Promise.all([
       this.prisma.transaction.count({
         where: {
           date: { gte: yesterday, lt: todayStart },
           status: 'completed',
+          ...tenantFilter,
         },
       }),
       this.prisma.transaction.aggregate({
         where: {
           date: { gte: yesterday, lt: todayStart },
           status: 'completed',
+          ...tenantFilter,
         },
         _sum: { total: true },
       }),
@@ -276,6 +287,7 @@ export class TransactionsService {
           transaction: {
             date: { gte: yesterday, lt: todayStart },
             status: 'completed',
+            ...tenantFilter,
           },
         },
         _sum: { quantity: true },
@@ -293,9 +305,10 @@ export class TransactionsService {
   }
 
   // Ventes des 7 derniers jours (pour graphique de tendance)
-  async getWeekTrend() {
+  async getWeekTrend(licenseKey?: string) {
     const days: Array<{ date: string; label: string; revenue: number; transactions: number }> = [];
     const dayLabels = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     for (let i = 6; i >= 0; i--) {
       const start = new Date();
@@ -306,10 +319,10 @@ export class TransactionsService {
 
       const [count, revenue] = await Promise.all([
         this.prisma.transaction.count({
-          where: { date: { gte: start, lt: end }, status: 'completed' },
+          where: { date: { gte: start, lt: end }, status: 'completed', ...tenantFilter },
         }),
         this.prisma.transaction.aggregate({
-          where: { date: { gte: start, lt: end }, status: 'completed' },
+          where: { date: { gte: start, lt: end }, status: 'completed', ...tenantFilter },
           _sum: { total: true },
         }),
       ]);
@@ -356,14 +369,16 @@ export class TransactionsService {
   }
 
   // Ventes par heure (pour graphique dashboard)
-  async getSalesByHour() {
+  async getSalesByHour(licenseKey?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const transactions = await this.prisma.transaction.findMany({
       where: {
         date: { gte: today },
         status: 'completed',
+        ...tenantFilter,
       },
       select: {
         date: true,
@@ -488,15 +503,17 @@ export class TransactionsService {
   }
 
   // Objectif mensuel (CA du mois vs objectif)
-  async getMonthlyGoal() {
+  async getMonthlyGoal(licenseKey?: string) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const result = await this.prisma.transaction.aggregate({
       where: {
         date: { gte: startOfMonth, lte: endOfMonth },
         status: 'completed',
+        ...tenantFilter,
       },
       _sum: { total: true },
       _count: true,
@@ -516,9 +533,10 @@ export class TransactionsService {
   }
 
   // Top produits vendus (ce mois)
-  async getTopProducts(limit: number = 5) {
+  async getTopProducts(limit: number = 5, licenseKey?: string) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const items = await this.prisma.transactionItem.groupBy({
       by: ['productId'],
@@ -526,6 +544,7 @@ export class TransactionsService {
         transaction: {
           date: { gte: startOfMonth },
           status: 'completed',
+          ...tenantFilter,
         },
       },
       _sum: {
@@ -558,14 +577,16 @@ export class TransactionsService {
   }
 
   // Panier moyen (aujourd'hui)
-  async getAverageBasket() {
+  async getAverageBasket(licenseKey?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const result = await this.prisma.transaction.aggregate({
       where: {
         date: { gte: today },
         status: 'completed',
+        ...tenantFilter,
       },
       _sum: { total: true },
       _count: true,
