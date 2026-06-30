@@ -88,7 +88,8 @@ export class AuthService {
       where: {
         status: 'active',
         role: { in: ['cashier', 'boss', 'accountant', 'stockist'] },
-        ...(licenseKey ? { licenseKey } : {}),
+        // Ne pas filtrer par licenseKey — tous les employés actifs peuvent se connecter
+        // Le licenseKey est vérifié à la connexion, pas à la sélection
       },
       select: {
         id: true,
