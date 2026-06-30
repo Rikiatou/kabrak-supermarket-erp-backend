@@ -25,6 +25,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CronModule } from './cron/cron.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { AdminModule } from './admin/admin.module';
+import { ReturnsModule } from './returns/returns.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { AdminModule } from './admin/admin.module';
     InvoicesModule,
     NotificationsModule,
     CronModule,
+    ReturnsModule,
   ],
   controllers: [AppController],
   providers: [

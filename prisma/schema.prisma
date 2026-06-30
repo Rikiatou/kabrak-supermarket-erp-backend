@@ -744,3 +744,57 @@ model ClientConfig {
   
   @@map("client_configs")
 }
+
+// ========================================
+// RETOURS PRODUITS
+// ========================================
+model ProductReturn {
+  id                    String   @id @default(cuid())
+  licenseKey            String?
+
+  originalTransactionId String?
+  originalInvoiceId     String?
+  clientName            String?
+
+  returnDate            DateTime @default(now())
+  reason                String   // "defect" | "wrong_item" | "changed_mind" | "other"
+  resolution            String   // "refund" | "exchange" | "store_credit"
+
+  totalRefunded         Int      @default(0)
+  refundMethod          String?  // "cash" | "mobile" | "card"
+
+  status                String   @default("completed")
+  note                  String?
+  createdBy             String?  // employee ID
+
+  items                 ReturnItem[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([licenseKey])
+  @@index([returnDate])
+  @@index([originalTransactionId])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                  String        @id @default(cuid())
+  returnId            String
+  return              ProductReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  productId           String?
+  productName         String
+  quantity            Int
+  unitPrice           Int
+  total               Int
+
+  // If resolution is exchange
+  exchangeProductId   String?
+  exchangeProductName String?
+  exchangeTotal       Int?
+
+  @@index([returnId])
+  @@index([productId])
+  @@map("return_items")
+}
