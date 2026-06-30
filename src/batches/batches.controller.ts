@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, Req } from '@nestjs/common';
 import { BatchesService } from './batches.service';
 
-@Controller('api/batches')
+@Controller('batches')
 export class BatchesController {
   constructor(private readonly batchesService: BatchesService) {}
 

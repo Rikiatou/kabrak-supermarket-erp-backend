@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Req } from '@nestjs/common';
 import { ReturnsService } from './returns.service';
 
-@Controller('api/returns')
+@Controller('returns')
 export class ReturnsController {
   constructor(private readonly returnsService: ReturnsService) {}
 
