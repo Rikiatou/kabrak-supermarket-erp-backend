@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { BatchesService } from '../batches/batches.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private batchesService: BatchesService) {}
 
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
@@ -72,6 +73,9 @@ export class TransactionsService {
             },
           },
         });
+
+        // Décrémenter le lot correspondant (FIFO — lot qui expire le plus tôt)
+        await this.batchesService.decrementFIFO(item.productId, item.quantity).catch(() => {});
 
         await this.prisma.stockMovement.create({
           data: {

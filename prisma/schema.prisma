@@ -60,6 +60,7 @@ model Product {
   stockMovements   StockMovement[]
   purchaseOrderItems PurchaseOrderItem[]
   invoiceItems      InvoiceItem[]
+  batches           ProductBatch[]
   
   // INDEX CRITIQUES pour performance avec 40K produits
   @@index([barcode])                    // Scan caisse ultra-rapide
@@ -797,4 +798,29 @@ model ReturnItem {
   @@index([returnId])
   @@index([productId])
   @@map("return_items")
+}
+
+// ========================================
+// LOTS / BATCHES (gestion par lots)
+// ========================================
+model ProductBatch {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  batchNumber String?  // Référence lot fournisseur (optionnel)
+  quantity    Int      @default(0)  // Quantité restante dans ce lot
+  initialQty  Int      @default(0)  // Quantité initiale reçue
+  expiryDate  DateTime?  // Date d'expiration de ce lot
+  receivedDate DateTime @default(now())  // Date de réception
+
+  licenseKey  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([expiryDate])
+  @@index([licenseKey])
+  @@map("product_batches")
 }

@@ -26,6 +26,7 @@ import { CronModule } from './cron/cron.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { AdminModule } from './admin/admin.module';
 import { ReturnsModule } from './returns/returns.module';
+import { BatchesModule } from './batches/batches.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ReturnsModule } from './returns/returns.module';
     NotificationsModule,
     CronModule,
     ReturnsModule,
+    BatchesModule,
   ],
   controllers: [AppController],
   providers: [
