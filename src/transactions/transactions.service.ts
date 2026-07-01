@@ -65,13 +65,15 @@ export class TransactionsService {
     const stockErrors: string[] = [];
     for (const item of createTransactionDto.items) {
       try {
+        // Empêcher le stock affiché de devenir négatif (chiffres migrés non fiables)
+        const currentProduct = await this.prisma.product.findUnique({
+          where: { id: item.productId },
+          select: { stock: true },
+        });
+        const newStock = Math.max(0, (currentProduct?.stock ?? 0) - item.quantity);
         await this.prisma.product.update({
           where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity,
-            },
-          },
+          data: { stock: newStock },
         });
 
         // Décrémenter le lot correspondant (FIFO — lot qui expire le plus tôt)

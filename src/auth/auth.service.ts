@@ -87,7 +87,7 @@ export class AuthService {
     return this.prisma.employee.findMany({
       where: {
         status: 'active',
-        role: { in: ['cashier', 'boss', 'accountant', 'stockist'] },
+        role: { in: ['cashier', 'boss', 'accountant', 'stockist', 'manager'] },
         // Ne pas filtrer par licenseKey — tous les employés actifs peuvent se connecter
         // Le licenseKey est vérifié à la connexion, pas à la sélection
       },
