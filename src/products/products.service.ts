@@ -172,9 +172,10 @@ export class ProductsService {
   }
 
   // Trouver par barcode (pour caisse)
-  async findByBarcode(barcode: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { barcode },
+  async findByBarcode(barcode: string, licenseKey?: string) {
+    const tenantFilter = this.tenantFilter(licenseKey);
+    const product = await this.prisma.product.findFirst({
+      where: { barcode, ...tenantFilter },
       include: { supplier: true },
     });
 
@@ -186,7 +187,9 @@ export class ProductsService {
   }
 
   // Top produits vendus — pour cache local du POS au démarrage
-  async getBestsellers(limit: number = 200) {
+  async getBestsellers(limit: number = 200, licenseKey?: string) {
+    const tenantFilter = this.tenantFilter(licenseKey);
+
     // Récupérer les produits les plus vendus (par quantité totale vendue)
     const topItems = await this.prisma.transactionItem.groupBy({
       by: ['productId'],
@@ -203,6 +206,7 @@ export class ProductsService {
         where: {
           isActive: true,
           id: { notIn: productIds },
+          ...tenantFilter,
         },
         orderBy: { stock: 'desc' },
         take: limit - productIds.length,
@@ -213,7 +217,7 @@ export class ProductsService {
 
     // Récupérer les produits complets
     const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, isActive: true },
+      where: { id: { in: productIds }, isActive: true, ...tenantFilter },
       include: { supplier: true },
     });
 

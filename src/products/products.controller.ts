@@ -45,9 +45,13 @@ export class ProductsController {
 
   // Top produits vendus (pour cache local du POS)
   @Get('bestsellers')
-  getBestsellers(@Query('limit') limit?: string) {
+  getBestsellers(
+    @Query('limit') limit?: string,
+    @Req() req?: Request & { licenseKey?: string },
+  ) {
     return this.productsService.getBestsellers(
       limit ? parseInt(limit) : 200,
+      req?.licenseKey,
     );
   }
 
@@ -80,8 +84,11 @@ export class ProductsController {
   }
 
   @Get('barcode/:barcode')
-  findByBarcode(@Param('barcode') barcode: string) {
-    return this.productsService.findByBarcode(barcode);
+  findByBarcode(
+    @Param('barcode') barcode: string,
+    @Req() req?: Request & { licenseKey?: string },
+  ) {
+    return this.productsService.findByBarcode(barcode, req?.licenseKey);
   }
 
   @Get(':id')
