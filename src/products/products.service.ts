@@ -85,7 +85,7 @@ export class ProductsService {
 
   // Recherche ultra-rapide (pour caisse)
   async search(searchDto: SearchProductDto, licenseKey?: string) {
-    const { q, category, barcode, sku, page = 1, limit = 100 } = searchDto;
+    const { q, category, barcode, sku, stockStatus, page = 1, limit = 100 } = searchDto;
     const skip = (page - 1) * limit;
     const tenantFilter = this.tenantFilter(licenseKey);
 
@@ -116,7 +116,7 @@ export class ProductsService {
     // Recherche multi-critères — combiner tenant filter ET text search avec AND
     const andConditions: any[] = [{ isActive: true }];
     if (licenseKey) andConditions.push({ OR: [{ licenseKey }, { licenseKey: null }] });
-    if (category) andConditions.push({ category });
+    if (category && category !== 'All') andConditions.push({ category });
     if (q) {
       andConditions.push({
         OR: [
@@ -126,6 +126,14 @@ export class ProductsService {
           { description: { contains: q, mode: 'insensitive' } },
         ],
       });
+    }
+    // Filtre statut stock (minStock est généralement 5 dans cette DB)
+    if (stockStatus === 'critical') {
+      andConditions.push({ stock: 0 });
+    } else if (stockStatus === 'low') {
+      andConditions.push({ stock: { gt: 0, lte: 5 } });
+    } else if (stockStatus === 'ok') {
+      andConditions.push({ stock: { gt: 5 } });
     }
     const where: any = { AND: andConditions };
 

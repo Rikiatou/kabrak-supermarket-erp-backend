@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SearchProductDto {
@@ -17,6 +17,12 @@ export class SearchProductDto {
   @IsString()
   @IsOptional()
   sku?: string;
+
+  // Filtre statut stock: critical (rupture), low (stock faible), ok (stock ok)
+  @IsString()
+  @IsOptional()
+  @IsIn(['critical', 'low', 'ok'])
+  stockStatus?: string;
 
   @Type(() => Number)
   @IsInt()
