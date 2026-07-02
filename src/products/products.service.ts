@@ -308,9 +308,10 @@ export class ProductsService {
   // Lister les catégories distinctes (avec compte de produits)
   async getCategories(_licenseKey?: string) {
     // groupBy a un bug de type Prisma dans cette version → raw SQL
+    // Table réelle: "products" (voir @@map("products") dans schema.prisma)
     const rows = await this.prisma.$queryRaw<{ category: string; count: bigint }[]>`
       SELECT category, COUNT(*)::bigint as count
-      FROM "Product"
+      FROM "products"
       WHERE "isActive" = true AND category IS NOT NULL AND category != ''
       GROUP BY category
       ORDER BY count DESC
