@@ -305,6 +305,19 @@ export class ProductsService {
       (p.expiryDate && new Date(p.expiryDate) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)));
   }
 
+  // Lister les catégories distinctes (avec compte de produits)
+  async getCategories(_licenseKey?: string) {
+    // groupBy a un bug de type Prisma dans cette version → raw SQL
+    const rows = await this.prisma.$queryRaw<{ category: string; count: bigint }[]>`
+      SELECT category, COUNT(*)::bigint as count
+      FROM "Product"
+      WHERE "isActive" = true AND category IS NOT NULL AND category != ''
+      GROUP BY category
+      ORDER BY count DESC
+    `;
+    return rows.map((r) => ({ name: r.category, count: Number(r.count) }));
+  }
+
   // Statistiques
   async getStats(licenseKey?: string) {
     const tenantFilter = this.tenantFilter(licenseKey);

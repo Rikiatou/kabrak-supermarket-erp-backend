@@ -55,6 +55,11 @@ export class ProductsController {
     );
   }
 
+  @Get('categories')
+  getCategories(@Req() req: Request & { licenseKey?: string }) {
+    return this.productsService.getCategories(req.licenseKey);
+  }
+
   @Get('stats')
   getStats(@Req() req: Request & { licenseKey?: string }) {
     return this.productsService.getStats(req.licenseKey);
