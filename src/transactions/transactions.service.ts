@@ -135,7 +135,7 @@ export class TransactionsService {
   }
 
   // Liste paginée
-  async findAll(page: number = 1, limit: number = 50, cashierId?: string, licenseKey?: string) {
+  async findAll(page: number = 1, limit: number = 50, cashierId?: string, licenseKey?: string, startDate?: Date, endDate?: Date) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
@@ -143,7 +143,12 @@ export class TransactionsService {
       where.cashierId = cashierId;
     }
     if (licenseKey) {
-      where.licenseKey = licenseKey;
+      where.OR = [{ licenseKey }, { licenseKey: null }];
+    }
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = startDate;
+      if (endDate) where.date.lte = new Date(endDate.getTime() + 23 * 60 * 60 * 1000 + 59 * 60 * 1000 + 59000); // end of day
     }
 
     const [transactions, total] = await Promise.all([

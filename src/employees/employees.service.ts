@@ -6,10 +6,12 @@ export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(activeOnly: boolean = true, licenseKey?: string) {
-    const tenantFilter = licenseKey ? { licenseKey } : {};
-    const baseWhere = activeOnly ? { status: { not: 'inactive' } } : {};
+    const baseWhere: any = activeOnly ? { status: { not: 'inactive' } } : {};
+    if (licenseKey) {
+      baseWhere.OR = [{ licenseKey }, { licenseKey: null }];
+    }
     return this.prisma.employee.findMany({
-      where: { ...baseWhere, ...tenantFilter },
+      where: baseWhere,
       select: {
         id: true,
         employeeNumber: true,

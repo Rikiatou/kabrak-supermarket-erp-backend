@@ -28,6 +28,8 @@ export class TransactionsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('cashierId') cashierId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Req() req?: Request & { licenseKey?: string },
   ) {
     return this.transactionsService.findAll(
@@ -35,6 +37,8 @@ export class TransactionsController {
       limit ? parseInt(limit) : 50,
       cashierId,
       req?.licenseKey,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
     );
   }
 
