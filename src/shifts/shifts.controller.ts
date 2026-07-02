@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, BadRequestException } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import { OpenShiftDto } from './dto/open-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
@@ -23,6 +23,14 @@ export class ShiftsController {
   @Get('employee/:employeeId')
   findByEmployee(@Param('employeeId') employeeId: string) {
     return this.shiftsService.findByEmployee(employeeId);
+  }
+
+  @Get('daily-z-report')
+  getDailyZReport(@Query('employeeId') employeeId: string, @Query('date') date: string) {
+    if (!employeeId || !date) {
+      throw new BadRequestException('employeeId and date are required');
+    }
+    return this.shiftsService.getDailyZReport(employeeId, date);
   }
 
   @Get(':id/z-report')

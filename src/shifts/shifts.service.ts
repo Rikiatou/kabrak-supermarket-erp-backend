@@ -247,4 +247,148 @@ export class ShiftsService {
       })),
     };
   }
+
+  // Z-Report journalier par caissier (sans dépendre des shifts)
+  // Agrège toutes les transactions d'un employé pour une date donnée
+  async getDailyZReport(employeeId: string, dateStr: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true, firstName: true, lastName: true, employeeNumber: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employé introuvable');
+    }
+
+    const employeeName = `${employee.firstName} ${employee.lastName}`;
+
+    // Construire la plage de la journée (00:00 → 23:59:59)
+    const dayStart = new Date(`${dateStr}T00:00:00.000`);
+    const dayEnd = new Date(`${dateStr}T23:59:59.999`);
+
+    // Toutes les transactions complétées de ce caissier ce jour
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        cashierId: employeeId,
+        date: { gte: dayStart, lte: dayEnd },
+        status: 'completed',
+      },
+      select: {
+        id: true,
+        transactionNumber: true,
+        date: true,
+        subtotal: true,
+        discount: true,
+        tax: true,
+        total: true,
+        paymentMethod: true,
+        cashGiven: true,
+        change: true,
+        registerId: true,
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // Agrégations
+    const grossSales = transactions.reduce((s, t) => s + t.subtotal, 0);
+    const totalDiscount = transactions.reduce((s, t) => s + t.discount, 0);
+    const totalTax = transactions.reduce((s, t) => s + t.tax, 0);
+    const netSales = transactions.reduce((s, t) => s + t.total, 0);
+    const customerCount = transactions.length;
+    const averageSale = customerCount > 0 ? Math.round(netSales / customerCount) : 0;
+
+    // Receipts by method
+    const cashReceipts = transactions
+      .filter((t) => t.paymentMethod === 'cash')
+      .reduce((s, t) => s + t.total, 0);
+    const cardReceipts = transactions
+      .filter((t) => t.paymentMethod === 'card')
+      .reduce((s, t) => s + t.total, 0);
+    const mobileReceipts = transactions
+      .filter((t) => t.paymentMethod === 'mobile')
+      .reduce((s, t) => s + t.total, 0);
+    const splitReceipts = transactions
+      .filter((t) => t.paymentMethod === 'split' || t.paymentMethod === 'mixed')
+      .reduce((s, t) => s + t.total, 0);
+
+    const cashReceived = transactions
+      .filter((t) => t.paymentMethod === 'cash')
+      .reduce((s, t) => s + (t.cashGiven || t.total), 0);
+    const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
+    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + splitReceipts;
+
+    // Returns
+    const returns = await this.prisma.transaction.aggregate({
+      where: {
+        cashierId: employeeId,
+        date: { gte: dayStart, lte: dayEnd },
+        status: 'refunded',
+      },
+      _sum: { total: true },
+    });
+
+    // Chercher les shifts de ce caissier ce jour (pour info)
+    const shifts = await this.prisma.shift.findMany({
+      where: {
+        employeeId,
+        OR: [
+          { openedAt: { gte: dayStart, lte: dayEnd } },
+          { closedAt: { gte: dayStart, lte: dayEnd } },
+        ],
+      },
+      orderBy: { openedAt: 'asc' },
+    });
+
+    const openingCash = shifts.reduce((s, sh) => s + (sh.openingCash || 0), 0);
+    const closingCash = shifts.reduce((s, sh) => s + (sh.closingCash || 0), 0);
+    const cashDrawerTotal = openingCash + cashReceived - changeGiven;
+
+    const registerId = shifts[0]?.registerId || transactions[0]?.registerId || 'N/A';
+    const registerName = shifts[0]?.registerName || registerId;
+
+    return {
+      shiftId: `daily-${dateStr}-${employeeId}`,
+      registerId,
+      registerName,
+      employeeId,
+      employeeName,
+      openedAt: dayStart,
+      closedAt: dayEnd,
+      openingCash,
+      closingCash,
+      expectedCash: cashDrawerTotal,
+      difference: closingCash - cashDrawerTotal,
+      notes: `Z-Report journalier — ${dateStr}`,
+
+      grossSales,
+      returnsAndCredits: returns._sum.total || 0,
+      totalDiscount,
+      totalTax,
+      netSales,
+      nonTaxableSales: netSales - totalTax,
+
+      receiptsByMethod: {
+        cash: cashReceipts,
+        card: cardReceipts,
+        mobile: mobileReceipts,
+        split: splitReceipts,
+      },
+      totalReceipts,
+      changeGiven,
+      cashReceived,
+      cashDrawerTotal,
+      totalExpected: totalReceipts + openingCash - changeGiven,
+
+      customerCount,
+      averageSale,
+
+      transactions: transactions.map((t) => ({
+        id: t.id,
+        transactionNumber: t.transactionNumber,
+        date: t.date,
+        total: t.total,
+        paymentMethod: t.paymentMethod,
+      })),
+    };
+  }
 }
