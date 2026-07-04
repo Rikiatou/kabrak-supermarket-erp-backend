@@ -172,6 +172,9 @@ export class ShiftsService {
     const mobileReceipts = transactions
       .filter((t) => t.paymentMethod === 'mobile')
       .reduce((s, t) => s + t.total, 0);
+    const orangeReceipts = transactions
+      .filter((t) => t.paymentMethod === 'orange')
+      .reduce((s, t) => s + t.total, 0);
     const splitTransactions = transactions.filter(
       (t) => t.paymentMethod === 'split' || t.paymentMethod === 'mixed',
     );
@@ -184,7 +187,7 @@ export class ShiftsService {
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
 
     // Total receipts = somme des ventes par méthode
-    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + splitReceipts;
+    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts + splitReceipts;
 
     // Cash drawer = opening cash + cash physically received - change given
     const cashDrawerTotal = shift.openingCash + cashReceived - changeGiven;
@@ -192,8 +195,8 @@ export class ShiftsService {
     // Total expected = opening cash + all sales - change given
     const totalExpected = shift.openingCash + cashReceipts + cardReceipts + mobileReceipts + splitReceipts - changeGiven;
 
-    // Returns & credits
-    const returns = await this.prisma.transaction.aggregate({
+    // Returns & credits — from refunded transactions
+    const refundedTx = await this.prisma.transaction.aggregate({
       where: {
         registerId: shift.registerId,
         date: { gte: startTime, lte: endTime },
@@ -201,6 +204,35 @@ export class ShiftsService {
       },
       _sum: { total: true },
     });
+
+    // Returns from ProductReturn table (processed via Returns page)
+    const productReturns = await this.prisma.productReturn.aggregate({
+      where: {
+        createdBy: shift.employeeId,
+        returnDate: { gte: startTime, lte: endTime },
+        status: 'completed',
+      },
+      _sum: { totalRefunded: true },
+    });
+
+    const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
+
+    // Invoice payments collected by this cashier during the shift
+    const invoicePayments = await this.prisma.invoicePayment.findMany({
+      where: {
+        cashierId: shift.employeeId,
+        date: { gte: startTime, lte: endTime },
+      },
+      select: { amount: true, method: true },
+    });
+
+    const invoiceCash = invoicePayments.filter(p => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
+    const invoiceCard = invoicePayments.filter(p => p.method === 'card').reduce((s, p) => s + p.amount, 0);
+    const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
+    const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
+
+    // Net sales after subtracting returns
+    const adjustedNetSales = netSales - returnsAndCredits;
 
     return {
       shiftId: shift.id,
@@ -217,23 +249,32 @@ export class ShiftsService {
       notes: shift.notes,
 
       grossSales,
-      returnsAndCredits: returns._sum.total || 0,
+      returnsAndCredits,
       totalDiscount,
       totalTax,
-      netSales,
-      nonTaxableSales: netSales - totalTax,
+      netSales: adjustedNetSales,
+      nonTaxableSales: adjustedNetSales - totalTax,
+
+      // Invoice payments collected during this shift
+      invoicePayments: {
+        cash: invoiceCash,
+        card: invoiceCard,
+        mobile: invoiceMobile,
+        total: invoiceTotal,
+      },
 
       receiptsByMethod: {
-        cash: cashReceipts,
-        card: cardReceipts,
-        mobile: mobileReceipts,
+        cash: cashReceipts + invoiceCash,
+        card: cardReceipts + invoiceCard,
+        mobile: mobileReceipts + invoiceMobile,
+        orange: orangeReceipts,
         split: splitReceipts,
       },
-      totalReceipts,
+      totalReceipts: totalReceipts + invoiceTotal,
       changeGiven,
       cashReceived,
-      cashDrawerTotal,
-      totalExpected,
+      cashDrawerTotal: cashDrawerTotal + invoiceCash,
+      totalExpected: totalExpected + invoiceCash,
 
       customerCount,
       averageSale,
@@ -307,6 +348,9 @@ export class ShiftsService {
     const mobileReceipts = transactions
       .filter((t) => t.paymentMethod === 'mobile')
       .reduce((s, t) => s + t.total, 0);
+    const orangeReceipts = transactions
+      .filter((t) => t.paymentMethod === 'orange')
+      .reduce((s, t) => s + t.total, 0);
     const splitReceipts = transactions
       .filter((t) => t.paymentMethod === 'split' || t.paymentMethod === 'mixed')
       .reduce((s, t) => s + t.total, 0);
@@ -315,10 +359,10 @@ export class ShiftsService {
       .filter((t) => t.paymentMethod === 'cash')
       .reduce((s, t) => s + (t.cashGiven || t.total), 0);
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
-    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + splitReceipts;
+    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts + splitReceipts;
 
-    // Returns
-    const returns = await this.prisma.transaction.aggregate({
+    // Returns — from refunded transactions
+    const refundedTx = await this.prisma.transaction.aggregate({
       where: {
         cashierId: employeeId,
         date: { gte: dayStart, lte: dayEnd },
@@ -326,6 +370,35 @@ export class ShiftsService {
       },
       _sum: { total: true },
     });
+
+    // Returns from ProductReturn table (processed via Returns page)
+    const productReturns = await this.prisma.productReturn.aggregate({
+      where: {
+        createdBy: employeeId,
+        returnDate: { gte: dayStart, lte: dayEnd },
+        status: 'completed',
+      },
+      _sum: { totalRefunded: true },
+    });
+
+    const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
+
+    // Invoice payments collected by this cashier during the day
+    const invoicePayments = await this.prisma.invoicePayment.findMany({
+      where: {
+        cashierId: employeeId,
+        date: { gte: dayStart, lte: dayEnd },
+      },
+      select: { amount: true, method: true },
+    });
+
+    const invoiceCash = invoicePayments.filter(p => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
+    const invoiceCard = invoicePayments.filter(p => p.method === 'card').reduce((s, p) => s + p.amount, 0);
+    const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
+    const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
+
+    // Net sales after subtracting returns
+    const adjustedNetSales = netSales - returnsAndCredits;
 
     // Chercher les shifts de ce caissier ce jour (pour info)
     const shifts = await this.prisma.shift.findMany({
@@ -341,7 +414,7 @@ export class ShiftsService {
 
     const openingCash = shifts.reduce((s, sh) => s + (sh.openingCash || 0), 0);
     const closingCash = shifts.reduce((s, sh) => s + (sh.closingCash || 0), 0);
-    const cashDrawerTotal = openingCash + cashReceived - changeGiven;
+    const cashDrawerTotal = openingCash + cashReceived - changeGiven + invoiceCash;
 
     const registerId = shifts[0]?.registerId || transactions[0]?.registerId || 'N/A';
     const registerName = shifts[0]?.registerName || registerId;
@@ -361,23 +434,32 @@ export class ShiftsService {
       notes: `Z-Report journalier — ${dateStr}`,
 
       grossSales,
-      returnsAndCredits: returns._sum.total || 0,
+      returnsAndCredits,
       totalDiscount,
       totalTax,
-      netSales,
-      nonTaxableSales: netSales - totalTax,
+      netSales: adjustedNetSales,
+      nonTaxableSales: adjustedNetSales - totalTax,
+
+      // Invoice payments collected during this day
+      invoicePayments: {
+        cash: invoiceCash,
+        card: invoiceCard,
+        mobile: invoiceMobile,
+        total: invoiceTotal,
+      },
 
       receiptsByMethod: {
-        cash: cashReceipts,
-        card: cardReceipts,
-        mobile: mobileReceipts,
+        cash: cashReceipts + invoiceCash,
+        card: cardReceipts + invoiceCard,
+        mobile: mobileReceipts + invoiceMobile,
+        orange: orangeReceipts,
         split: splitReceipts,
       },
-      totalReceipts,
+      totalReceipts: totalReceipts + invoiceTotal,
       changeGiven,
       cashReceived,
       cashDrawerTotal,
-      totalExpected: totalReceipts + openingCash - changeGiven,
+      totalExpected: totalReceipts + invoiceTotal + openingCash - changeGiven,
 
       customerCount,
       averageSale,

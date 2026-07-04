@@ -53,14 +53,12 @@ model Product {
   // Métadonnées
   imageUrl    String?
   isActive    Boolean  @default(true)
-  licenseKey  String?  // Multi-tenant isolation
-
+  
   // Relations
   transactionItems TransactionItem[]
   stockMovements   StockMovement[]
   purchaseOrderItems PurchaseOrderItem[]
   invoiceItems      InvoiceItem[]
-  batches           ProductBatch[]
   
   // INDEX CRITIQUES pour performance avec 40K produits
   @@index([barcode])                    // Scan caisse ultra-rapide
@@ -72,7 +70,6 @@ model Product {
   @@index([isActive])                   // Produits actifs seulement
   @@index([supplierId])                 // Produits par fournisseur
   @@index([markdownPrice])              // Produits en markdown actif
-  @@index([licenseKey])                 // Multi-tenant isolation
   
   @@map("products")
 }
@@ -90,7 +87,6 @@ model Supplier {
   paymentTerms  String   @default("30 jours")
   rating        Float    @default(0)
   isActive      Boolean  @default(true)
-  licenseKey    String?  // Multi-tenant isolation
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -99,7 +95,6 @@ model Supplier {
   
   @@index([name])
   @@index([isActive])
-  @@index([licenseKey])
   
   @@map("suppliers")
 }
@@ -116,9 +111,7 @@ model Transaction {
   cashierId     String
   cashier       Employee @relation(fields: [cashierId], references: [id])
   registerId    String?
-  // NOTE: FK removed — registerId is now a plain string (e.g. "reg1")
-  // to allow hardcoded register IDs from the frontend without requiring
-  // a CashRegister row to exist in the database.
+  register      CashRegister? @relation(fields: [registerId], references: [id])
   
   // Montants (en centimes FCFA)
   subtotal      Int
@@ -142,8 +135,7 @@ model Transaction {
   syncStatus    String   @default("pending") // "pending", "synced", "failed"
   syncedAt      DateTime?
   syncError     String?
-  licenseKey    String?  // Multi-tenant isolation
-
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -156,7 +148,6 @@ model Transaction {
   @@index([syncStatus])           // CRITIQUE pour offline-first
   @@index([transactionNumber])
   @@index([customerId])
-  @@index([licenseKey])           // Multi-tenant isolation
   
   @@map("transactions")
 }
@@ -197,19 +188,16 @@ model CashRegister {
   location    String?  // "Entrée principale", "Sortie"
   isActive    Boolean  @default(true)
   
-  // Multi-Store: caisse rattachée à un magasin
-  storeId     String?
-  store       Store?   @relation(fields: [storeId], references: [id])
-  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  // NOTE: schedules back-relation removed — registerId is now a plain string
-
+  
+  transactions Transaction[]
+  shifts       Shift[]
+  schedules    Schedule[]
+  
   @@index([code])
   @@index([status])
   @@index([isActive])
-  @@index([storeId])
   
   @@map("cash_registers")
 }
@@ -217,11 +205,11 @@ model CashRegister {
 model Shift {
   id            String   @id @default(cuid())
   
-  registerId    String   // Plain string (e.g. "reg1") — no FK
-  registerName  String?  // Display name (e.g. "Caisse 1")
+  registerId    String
+  register      CashRegister @relation(fields: [registerId], references: [id])
   
   employeeId    String
-  employeeName  String?  // Display name (e.g. "Paul Mbarga")
+  employee      Employee @relation(fields: [employeeId], references: [id])
   
   openedAt      DateTime @default(now())
   closedAt      DateTime?
@@ -233,6 +221,8 @@ model Shift {
   
   status        String   @default("open") // "open", "closed"
   notes         String?
+  employeeName  String?
+  registerName  String?
   
   @@index([registerId])
   @@index([employeeId])
@@ -261,19 +251,17 @@ model Employee {
   
   // Auth (simple pour commencer)
   pin           String?  // PIN 4 chiffres pour login caisse
-  licenseKey    String?  // Multi-tenant isolation
-
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
   transactions  Transaction[]
+  shifts        Shift[]
   schedules     Schedule[]
-  stockMovements StockMovement[] @relation("StockMovementEmployee")
   
   @@index([employeeNumber])
   @@index([role])
   @@index([status])
-  @@index([licenseKey])
   
   @@map("employees")
 }
@@ -295,20 +283,17 @@ model StockMovement {
   
   notes       String?
   createdBy   String?  // ID employé
-  employee    Employee? @relation("StockMovementEmployee", fields: [createdBy], references: [id])
   
   // Synchronisation
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  licenseKey  String?  // Multi-tenant isolation
-
+  
   createdAt   DateTime @default(now())
   
   @@index([productId])
   @@index([type])
   @@index([createdAt])
   @@index([syncStatus])
-  @@index([licenseKey])
   
   @@map("stock_movements")
 }
@@ -331,8 +316,7 @@ model PurchaseOrder {
   status       String   @default("draft") // "draft", "sent", "received", "cancelled"
   
   notes        String?
-  licenseKey   String?  // Multi-tenant isolation
-
+  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
@@ -342,7 +326,6 @@ model PurchaseOrder {
   @@index([status])
   @@index([date])
   @@index([orderNumber])
-  @@index([licenseKey])
   
   @@map("purchase_orders")
 }
@@ -385,8 +368,7 @@ model Customer {
   tier        String   @default("bronze") // "bronze", "silver", "gold", "platinum"
   
   isActive    Boolean  @default(true)
-  licenseKey  String?  // Multi-tenant isolation
-
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -397,7 +379,6 @@ model Customer {
   @@index([phone])
   @@index([customerNumber])
   @@index([tier])
-  @@index([licenseKey])
   
   @@map("customers")
 }
@@ -458,12 +439,10 @@ model Expense {
   paymentMethod String @default("cash")
   supplier    String?
   status      String   @default("paid") // "paid", "pending"
-  licenseKey  String?  // Multi-tenant isolation
   createdAt   DateTime @default(now())
   
   @@index([date])
   @@index([category])
-  @@index([licenseKey])
   @@map("expenses")
 }
 
@@ -517,8 +496,7 @@ model Invoice {
   paymentMethod String? // "cash", "card", "mobile", "transfer"
   
   notes       String?
-  licenseKey  String?  // Multi-tenant isolation
-
+  
   items       InvoiceItem[]
   payments    InvoicePayment[]
   
@@ -530,7 +508,6 @@ model Invoice {
   @@index([date])
   @@index([customerId])
   @@index([clientName])
-  @@index([licenseKey])
   
   @@map("invoices")
 }
@@ -569,11 +546,13 @@ model InvoicePayment {
   method      String   // "cash", "card", "mobile", "transfer"
   date        DateTime @default(now())
   note        String?  // ex: "1er versement", "acompte"
+  cashierId   String?  // employeeId who collected the payment (for Z-Report)
   
   createdAt   DateTime @default(now())
   
   @@index([invoiceId])
   @@index([date])
+  @@index([cashierId])
   
   @@map("invoice_payments")
 }
@@ -587,9 +566,8 @@ model Schedule {
   employeeId  String
   employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
-  registerId  String  // Plain string (e.g. "reg1") — no FK
-  // NOTE: FK removed — registerId is now a plain string to allow hardcoded
-  // register IDs from the frontend without requiring a CashRegister row.
+  registerId  String
+  register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
   
   // Jour de la semaine: 0=dimanche, 1=lundi, ..., 6=samedi
   dayOfWeek   Int
@@ -618,209 +596,49 @@ model Schedule {
 }
 
 // ========================================
-// LICENCES (SaaS - 2 offres: STANDARD / MULTI_STORE)
-// ========================================
-model License {
-  id            String   @id @default(cuid())
-  licenseKey    String   @unique // KABRAK-STD-2024-EASYSHOP-A7F3D9
-  
-  // Client
-  clientName    String
-  clientEmail   String
-  clientPhone   String
-  clientAddress String?
-  
-  // Type de licence
-  // STANDARD: 1 magasin, 300 000 FCFA/an
-  // MULTI_STORE: X magasins, sur devis
-  type          String   @default("STANDARD") // "STANDARD" | "MULTI_STORE"
-  maxStores     Int      @default(1)
-  
-  // Durée et dates
-  durationMonths Int     @default(12) // 6 ou 12
-  issuedAt      DateTime @default(now())
-  expiresAt     DateTime
-  renewedAt     DateTime?
-  
-  // Statut
-  status        String   @default("ACTIVE") // "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED"
-  
-  // Tracking
-  lastCheckAt   DateTime?
-  activations   Int      @default(0)
-  
-  // Notes internes (admin)
-  internalNotes String?
-  
-  // Relations
-  stores        Store[]
-  config        ClientConfig?
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([licenseKey])
-  @@index([clientEmail])
-  @@index([status])
-  @@index([expiresAt])
-  @@index([type])
-  
-  @@map("licenses")
-}
-
-// ========================================
-// MAGASINS (Multi-Store)
-// ========================================
-model Store {
-  id          String   @id @default(cuid())
-  licenseId   String
-  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  
-  name        String   // "Easy Shop Bonamoussadi"
-  code        String   @unique // "STORE001"
-  address     String?
-  phone       String?
-  city        String?
-  
-  // Actif/inactif
-  isActive    Boolean  @default(true)
-  
-  // Relations - chaque magasin a ses propres caisses, produits, etc.
-  cashRegisters CashRegister[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([licenseId])
-  @@index([code])
-  @@index([isActive])
-  
-  @@map("stores")
-}
-
-// ========================================
-// CONFIGURATION CLIENT (Multi-Tenant)
-// ========================================
-model ClientConfig {
-  id          String   @id @default(cuid())
-  licenseId   String   @unique
-  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  
-  // Identité du supermarché
-  supermarketName    String   // "Easy Shop"
-  supermarketSlogan  String?
-  logoUrl            String?  // URL ou base64
-  primaryColor       String   @default("#2563eb") // Couleur principale
-  
-  // Coordonnées (sur tickets/factures)
-  address    String?
-  phone      String?
-  email      String?
-  website    String?
-
-  // Informations légales / société
-  rccmNumber    String?  // N° RC: CM/YDE/2024/B/123
-  taxNumber     String?  // N° contribuable / Tax ID
-  legalForm     String?  // SARL, EURL, etc.
-  capital       String?  // Capital social
-
-  // Personnalisation tickets
-  receiptHeader    String? // Message en haut du ticket
-  receiptFooter    String? // "Merci de votre visite!"
-  receiptShowLogo  Boolean @default(true)
-  
-  // Personnalisation factures
-  invoiceFooter    String?
-  
-  // Devise
-  currency         String  @default("FCFA")
-  taxRate          Float   @default(15.5)
-  
-  // Paramètres POS
-  enableLoyalty    Boolean @default(true)
-  enableAutoPrint  Boolean @default(false)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@map("client_configs")
-}
-
-// ========================================
 // RETOURS PRODUITS
 // ========================================
 model ProductReturn {
   id                    String   @id @default(cuid())
   licenseKey            String?
-
   originalTransactionId String?
   originalInvoiceId     String?
   clientName            String?
-
   returnDate            DateTime @default(now())
-  reason                String   // "defect" | "wrong_item" | "changed_mind" | "other"
-  resolution            String   // "refund" | "exchange" | "store_credit"
-
+  reason                String
+  resolution            String
   totalRefunded         Int      @default(0)
-  refundMethod          String?  // "cash" | "mobile" | "card"
-
+  refundMethod          String?
   status                String   @default("completed")
   note                  String?
-  createdBy             String?  // employee ID
+  createdBy             String?  // employeeId of cashier who processed the return
 
   items                 ReturnItem[]
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
   @@index([licenseKey])
-  @@index([returnDate])
   @@index([originalTransactionId])
+  @@index([returnDate])
+  @@index([createdBy])
+
   @@map("returns")
 }
 
 model ReturnItem {
-  id                  String        @id @default(cuid())
+  id                  String  @id @default(cuid())
   returnId            String
-  return              ProductReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  productReturn       ProductReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
 
   productId           String?
   productName         String
   quantity            Int
   unitPrice           Int
   total               Int
-
-  // If resolution is exchange
   exchangeProductId   String?
   exchangeProductName String?
   exchangeTotal       Int?
 
   @@index([returnId])
   @@index([productId])
+
   @@map("return_items")
-}
-
-// ========================================
-// LOTS / BATCHES (gestion par lots)
-// ========================================
-model ProductBatch {
-  id          String   @id @default(cuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  batchNumber String?  // Référence lot fournisseur (optionnel)
-  quantity    Int      @default(0)  // Quantité restante dans ce lot
-  initialQty  Int      @default(0)  // Quantité initiale reçue
-  expiryDate  DateTime?  // Date d'expiration de ce lot
-  receivedDate DateTime @default(now())  // Date de réception
-
-  licenseKey  String?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([productId])
-  @@index([expiryDate])
-  @@index([licenseKey])
-  @@map("product_batches")
 }

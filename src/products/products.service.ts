@@ -10,66 +10,46 @@ export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
   // Créer un produit
-  async create(createProductDto: CreateProductDto, licenseKey?: string) {
-    // Générer SKU et barcode automatiquement si non fournis
-    const count = await this.prisma.product.count();
-    const autoSku = `PRD-${String(count + 1).padStart(5, '0')}`;
-    const autoBarcode = `2${String(count + 1).padStart(12, '0')}`;
-
-    const sku = createProductDto.sku || autoSku;
-    const barcode = createProductDto.barcode || autoBarcode;
-
+  async create(createProductDto: CreateProductDto) {
     // Vérifier si SKU ou barcode existe déjà
     const existing = await this.prisma.product.findFirst({
       where: {
         OR: [
-          { sku },
-          { barcode },
+          { sku: createProductDto.sku },
+          { barcode: createProductDto.barcode },
         ],
       },
     });
 
     if (existing) {
       throw new ConflictException(
-        `Produit avec SKU "${sku}" ou barcode "${barcode}" existe déjà`,
+        `Produit avec SKU "${createProductDto.sku}" ou barcode "${createProductDto.barcode}" existe déjà`,
       );
     }
 
     return this.prisma.product.create({
-      data: {
-        ...createProductDto,
-        sku,
-        barcode,
-        ...(licenseKey ? { licenseKey } : {}),
-      },
+      data: createProductDto as any,
       include: {
         supplier: true,
       },
     });
   }
 
-  // Filtre tenant: produits du client OU produits sans licenseKey (catalogue global)
-  private tenantFilter(licenseKey?: string) {
-    if (!licenseKey) return {};
-    return { OR: [{ licenseKey }, { licenseKey: null }] };
-  }
-
   // Liste paginée
-  async findAll(page: number = 1, limit: number = 100, licenseKey?: string) {
+  async findAll(page: number = 1, limit: number = 100) {
     const skip = (page - 1) * limit;
-    const tenantFilter = this.tenantFilter(licenseKey);
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
         skip,
         take: limit,
-        where: { isActive: true, ...tenantFilter },
+        where: { isActive: true },
         include: {
           supplier: true,
         },
         orderBy: { name: 'asc' },
       }),
-      this.prisma.product.count({ where: { isActive: true, ...tenantFilter } }),
+      this.prisma.product.count({ where: { isActive: true } }),
     ]);
 
     return {
@@ -84,15 +64,14 @@ export class ProductsService {
   }
 
   // Recherche ultra-rapide (pour caisse)
-  async search(searchDto: SearchProductDto, licenseKey?: string) {
-    const { q, category, barcode, sku, stockStatus, page = 1, limit = 100 } = searchDto;
+  async search(searchDto: SearchProductDto) {
+    const { q, category, barcode, sku, page = 1, limit = 100 } = searchDto;
     const skip = (page - 1) * limit;
-    const tenantFilter = this.tenantFilter(licenseKey);
 
     // Recherche par barcode exact (scan caisse)
     if (barcode) {
-      const product = await this.prisma.product.findFirst({
-        where: { barcode, AND: licenseKey ? [{ OR: [{ licenseKey }, { licenseKey: null }] }] : [] },
+      const product = await this.prisma.product.findUnique({
+        where: { barcode },
         include: { supplier: true },
       });
       return {
@@ -103,8 +82,8 @@ export class ProductsService {
 
     // Recherche par SKU exact
     if (sku) {
-      const product = await this.prisma.product.findFirst({
-        where: { sku, AND: licenseKey ? [{ OR: [{ licenseKey }, { licenseKey: null }] }] : [] },
+      const product = await this.prisma.product.findUnique({
+        where: { sku },
         include: { supplier: true },
       });
       return {
@@ -113,29 +92,21 @@ export class ProductsService {
       };
     }
 
-    // Recherche multi-critères — combiner tenant filter ET text search avec AND
-    const andConditions: any[] = [{ isActive: true }];
-    if (licenseKey) andConditions.push({ OR: [{ licenseKey }, { licenseKey: null }] });
-    if (category && category !== 'All') andConditions.push({ category });
+    // Recherche multi-critères
+    const where: any = { isActive: true };
+
+    if (category) {
+      where.category = category;
+    }
+
     if (q) {
-      andConditions.push({
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { sku: { contains: q, mode: 'insensitive' } },
-          { barcode: { contains: q } },
-          { description: { contains: q, mode: 'insensitive' } },
-        ],
-      });
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { sku: { contains: q, mode: 'insensitive' } },
+        { barcode: { contains: q } },
+        { description: { contains: q, mode: 'insensitive' } },
+      ];
     }
-    // Filtre statut stock (minStock est généralement 5 dans cette DB)
-    if (stockStatus === 'critical') {
-      andConditions.push({ stock: 0 });
-    } else if (stockStatus === 'low') {
-      andConditions.push({ stock: { gt: 0, lte: 5 } });
-    } else if (stockStatus === 'ok') {
-      andConditions.push({ stock: { gt: 5 } });
-    }
-    const where: any = { AND: andConditions };
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -180,10 +151,9 @@ export class ProductsService {
   }
 
   // Trouver par barcode (pour caisse)
-  async findByBarcode(barcode: string, licenseKey?: string) {
-    const tenantFilter = this.tenantFilter(licenseKey);
-    const product = await this.prisma.product.findFirst({
-      where: { barcode, ...tenantFilter },
+  async findByBarcode(barcode: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { barcode },
       include: { supplier: true },
     });
 
@@ -192,48 +162,6 @@ export class ProductsService {
     }
 
     return product;
-  }
-
-  // Top produits vendus — pour cache local du POS au démarrage
-  async getBestsellers(limit: number = 200, licenseKey?: string) {
-    const tenantFilter = this.tenantFilter(licenseKey);
-
-    // Récupérer les produits les plus vendus (par quantité totale vendue)
-    const topItems = await this.prisma.transactionItem.groupBy({
-      by: ['productId'],
-      _sum: { quantity: true },
-      orderBy: { _sum: { quantity: 'desc' } },
-      take: limit,
-    });
-
-    const productIds = topItems.map((t) => t.productId);
-
-    // Si pas assez de ventes, compléter avec des produits par stock
-    if (productIds.length < limit) {
-      const extra = await this.prisma.product.findMany({
-        where: {
-          isActive: true,
-          id: { notIn: productIds },
-          ...tenantFilter,
-        },
-        orderBy: { stock: 'desc' },
-        take: limit - productIds.length,
-        select: { id: true },
-      });
-      productIds.push(...extra.map((p) => p.id));
-    }
-
-    // Récupérer les produits complets
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, isActive: true, ...tenantFilter },
-      include: { supplier: true },
-    });
-
-    // Trier selon l'ordre des bestsellers
-    const orderMap = new Map(productIds.map((id, i) => [id, i]));
-    products.sort((a, b) => (orderMap.get(a.id) ?? 9999) - (orderMap.get(b.id) ?? 9999));
-
-    return { data: products, total: products.length };
   }
 
   // Mettre à jour
@@ -280,16 +208,12 @@ export class ProductsService {
   }
 
   // Alertes stock
-  async getStockAlerts(licenseKey?: string) {
-    const tenantFilter = this.tenantFilter(licenseKey);
-    // Prisma ne supporte pas la comparaison entre deux colonnes directement
-    // On récupère les produits et on filtre en mémoire
-    const products = await this.prisma.product.findMany({
+  async getStockAlerts() {
+    return this.prisma.product.findMany({
       where: {
         isActive: true,
-        ...tenantFilter,
         OR: [
-          { stock: { lte: 10 } }, // Seuil minimum par défaut
+          { stock: { lte: this.prisma.product.fields.minStock } },
           {
             expiryDate: {
               lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 jours
@@ -300,35 +224,16 @@ export class ProductsService {
       include: { supplier: true },
       orderBy: { stock: 'asc' },
     });
-    // Filtrer ceux où stock <= minStock
-    return products.filter((p) => p.stock <= p.minStock || 
-      (p.expiryDate && new Date(p.expiryDate) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)));
-  }
-
-  // Lister les catégories distinctes (avec compte de produits)
-  async getCategories(_licenseKey?: string) {
-    // groupBy a un bug de type Prisma dans cette version → raw SQL
-    // Table réelle: "products" (voir @@map("products") dans schema.prisma)
-    const rows = await this.prisma.$queryRaw<{ category: string; count: bigint }[]>`
-      SELECT category, COUNT(*)::bigint as count
-      FROM "products"
-      WHERE "isActive" = true AND category IS NOT NULL AND category != ''
-      GROUP BY category
-      ORDER BY count DESC
-    `;
-    return rows.map((r) => ({ name: r.category, count: Number(r.count) }));
   }
 
   // Statistiques
-  async getStats(licenseKey?: string) {
-    const tenantFilter = this.tenantFilter(licenseKey);
+  async getStats() {
     const [total, lowStock, expiring, outOfStock] = await Promise.all([
-      this.prisma.product.count({ where: { isActive: true, ...tenantFilter } }),
+      this.prisma.product.count({ where: { isActive: true } }),
       this.prisma.product.count({
         where: {
           isActive: true,
-          stock: { lte: 10 },
-          ...tenantFilter,
+          stock: { lte: this.prisma.product.fields.minStock },
         },
       }),
       this.prisma.product.count({
@@ -337,11 +242,10 @@ export class ProductsService {
           expiryDate: {
             lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           },
-          ...tenantFilter,
         },
       }),
       this.prisma.product.count({
-        where: { isActive: true, stock: 0, ...tenantFilter },
+        where: { isActive: true, stock: 0 },
       }),
     ]);
 
@@ -407,15 +311,13 @@ export class ProductsService {
   }
 
   // Lister tous les produits en markdown actif
-  async getMarkdowns(page: number = 1, limit: number = 50, licenseKey?: string) {
+  async getMarkdowns(page: number = 1, limit: number = 50) {
     const skip = (page - 1) * limit;
     const now = new Date();
-    const tenantFilter = this.tenantFilter(licenseKey);
 
     const where = {
       isActive: true,
       markdownPrice: { not: null },
-      ...tenantFilter,
       // Exclure les markdowns expirés (si markdownExpiresAt est dans le passé)
       OR: [
         { markdownExpiresAt: null },

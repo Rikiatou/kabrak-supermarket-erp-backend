@@ -7,9 +7,7 @@ import {
   Param,
   Delete,
   Query,
-  Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -21,65 +19,38 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  create(@Body() createProductDto: CreateProductDto, @Req() req: Request & { licenseKey?: string }) {
-    return this.productsService.create(createProductDto, req.licenseKey);
+  create(@Body() createProductDto: CreateProductDto) {
+    return this.productsService.create(createProductDto);
   }
 
   @Get()
-  findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Req() req?: Request & { licenseKey?: string },
-  ) {
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.productsService.findAll(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 100,
-      req?.licenseKey,
     );
   }
 
   @Get('search')
-  search(@Query() searchDto: SearchProductDto, @Req() req: Request & { licenseKey?: string }) {
-    return this.productsService.search(searchDto, req.licenseKey);
-  }
-
-  // Top produits vendus (pour cache local du POS)
-  @Get('bestsellers')
-  getBestsellers(
-    @Query('limit') limit?: string,
-    @Req() req?: Request & { licenseKey?: string },
-  ) {
-    return this.productsService.getBestsellers(
-      limit ? parseInt(limit) : 200,
-      req?.licenseKey,
-    );
-  }
-
-  @Get('categories')
-  getCategories(@Req() req: Request & { licenseKey?: string }) {
-    return this.productsService.getCategories(req.licenseKey);
+  search(@Query() searchDto: SearchProductDto) {
+    return this.productsService.search(searchDto);
   }
 
   @Get('stats')
-  getStats(@Req() req: Request & { licenseKey?: string }) {
-    return this.productsService.getStats(req.licenseKey);
+  getStats() {
+    return this.productsService.getStats();
   }
 
   @Get('alerts')
-  getAlerts(@Req() req: Request & { licenseKey?: string }) {
-    return this.productsService.getStockAlerts(req.licenseKey);
+  getAlerts() {
+    return this.productsService.getStockAlerts();
   }
 
   @Get('markdowns')
-  getMarkdowns(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Req() req?: Request & { licenseKey?: string },
-  ) {
+  getMarkdowns(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.productsService.getMarkdowns(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
-      req?.licenseKey,
     );
   }
 
@@ -89,11 +60,8 @@ export class ProductsController {
   }
 
   @Get('barcode/:barcode')
-  findByBarcode(
-    @Param('barcode') barcode: string,
-    @Req() req?: Request & { licenseKey?: string },
-  ) {
-    return this.productsService.findByBarcode(barcode, req?.licenseKey);
+  findByBarcode(@Param('barcode') barcode: string) {
+    return this.productsService.findByBarcode(barcode);
   }
 
   @Get(':id')

@@ -115,7 +115,7 @@ export class InvoicesService {
   }
 
   // Encaisser un versement sur une facture
-  async addPayment(invoiceId: string, dto: CreatePaymentDto) {
+  async addPayment(invoiceId: string, dto: CreatePaymentDto, cashierId?: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { payments: true },
@@ -142,6 +142,7 @@ export class InvoicesService {
         amount: dto.amount,
         method: dto.method,
         note: dto.note || null,
+        cashierId: cashierId || null,
       },
     });
 

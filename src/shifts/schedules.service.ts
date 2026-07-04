@@ -8,20 +8,26 @@ export class SchedulesService {
 
   // Créer un créneau de planning
   async create(dto: CreateScheduleDto) {
-    // Vérifier que l'employé existe et est actif
+    // Vérifier que l'employé existe et est un caissier/superviseur
     const employee = await this.prisma.employee.findUnique({
       where: { id: dto.employeeId },
     });
     if (!employee) {
       throw new NotFoundException(`Employé #${dto.employeeId} non trouvé`);
     }
-    if (employee.status === 'inactive') {
+    if (!['cashier', 'supervisor', 'manager'].includes(employee.role)) {
       throw new BadRequestException(
-        `Cet employé est inactif et ne peut pas être assigné (statut: ${employee.status})`,
+        `Seuls les caissiers, superviseurs et managers peuvent être assignés à une caisse (rôle: ${employee.role})`,
       );
     }
 
-    // NOTE: registerId is now a plain string (e.g. "reg1") — no FK check needed
+    // Vérifier que la caisse existe
+    const register = await this.prisma.cashRegister.findUnique({
+      where: { id: dto.registerId },
+    });
+    if (!register) {
+      throw new NotFoundException(`Caisse #${dto.registerId} non trouvée`);
+    }
 
     // Vérifier que startTime < endTime
     if (dto.startTime >= dto.endTime) {
@@ -50,7 +56,8 @@ export class SchedulesService {
       data: dto,
       include: {
         employee: true,
-              },
+        register: true,
+      },
     });
   }
 
@@ -60,49 +67,32 @@ export class SchedulesService {
       where: { isActive: true },
       include: {
         employee: true,
-              },
+        register: true,
+      },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
 
-    // Récupérer les caisses pour mapper registerId → nom
-    const registers = await this.prisma.cashRegister.findMany();
-    const registerMap = new Map(registers.map((r) => [r.id, r.name]));
-
-    // Enrichir chaque schedule avec le nom de la caisse
-    const enriched = schedules.map((s) => ({
-      ...s,
-      registerName: registerMap.get(s.registerId) || s.registerId,
-    }));
-
     // Grouper par jour pour faciliter l'affichage frontend
-    const byDay: Record<number, typeof enriched> = {};
+    const byDay: Record<number, typeof schedules> = {};
     for (let i = 0; i <= 6; i++) {
       byDay[i] = [];
     }
-    enriched.forEach((s) => {
+    schedules.forEach((s) => {
       byDay[s.dayOfWeek].push(s);
     });
 
     return {
-      all: enriched,
+      all: schedules,
       byDay,
-      total: enriched.length,
+      total: schedules.length,
     };
-  }
-
-  // Lister toutes les caisses pour le planning
-  async getRegisters() {
-    return this.prisma.cashRegister.findMany({
-      where: { isActive: true },
-      orderBy: { code: 'asc' },
-    });
   }
 
   // Planning d'un employé spécifique
   async findByEmployee(employeeId: string) {
     return this.prisma.schedule.findMany({
       where: { employeeId, isActive: true },
-      include: { employee: true },
+      include: { register: true },
       orderBy: { dayOfWeek: 'asc' },
     });
   }
@@ -131,7 +121,8 @@ export class SchedulesService {
       },
       include: {
         employee: true,
-              },
+        register: true,
+      },
       orderBy: { startTime: 'asc' },
     });
 
@@ -158,7 +149,8 @@ export class SchedulesService {
       data: dto,
       include: {
         employee: true,
-              },
+        register: true,
+      },
     });
   }
 
@@ -210,7 +202,8 @@ export class SchedulesService {
       },
       include: {
         employee: true,
-              },
+        register: true,
+      },
     });
   }
 }

@@ -5,9 +5,7 @@ import {
   Body,
   Param,
   Query,
-  Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
@@ -16,11 +14,8 @@ export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post()
-  create(
-    @Body() createTransactionDto: CreateTransactionDto,
-    @Req() req: Request & { licenseKey?: string },
-  ) {
-    return this.transactionsService.create(createTransactionDto, req.licenseKey);
+  create(@Body() createTransactionDto: CreateTransactionDto) {
+    return this.transactionsService.create(createTransactionDto);
   }
 
   @Get()
@@ -28,33 +23,27 @@ export class TransactionsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('cashierId') cashierId?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Req() req?: Request & { licenseKey?: string },
   ) {
     return this.transactionsService.findAll(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
       cashierId,
-      req?.licenseKey,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
     );
   }
 
   @Get('stats/today')
-  getTodayStats(@Req() req: Request & { licenseKey?: string }) {
-    return this.transactionsService.getTodayStats(req.licenseKey);
+  getTodayStats() {
+    return this.transactionsService.getTodayStats();
   }
 
   @Get('stats/yesterday')
-  getYesterdayStats(@Req() req: Request & { licenseKey?: string }) {
-    return this.transactionsService.getYesterdayStats(req.licenseKey);
+  getYesterdayStats() {
+    return this.transactionsService.getYesterdayStats();
   }
 
   @Get('stats/week-trend')
-  getWeekTrend(@Req() req: Request & { licenseKey?: string }) {
-    return this.transactionsService.getWeekTrend(req.licenseKey);
+  getWeekTrend() {
+    return this.transactionsService.getWeekTrend();
   }
 
   @Get('stats/by-register')
@@ -63,34 +52,13 @@ export class TransactionsController {
   }
 
   @Get('stats/by-hour')
-  getSalesByHour(@Req() req: Request & { licenseKey?: string }) {
-    return this.transactionsService.getSalesByHour(req.licenseKey);
+  getSalesByHour() {
+    return this.transactionsService.getSalesByHour();
   }
 
   @Get('stats/margin-by-category')
   getMarginByCategory() {
     return this.transactionsService.getMarginByCategory();
-  }
-
-  @Get('stats/monthly-goal')
-  getMonthlyGoal(@Req() req: Request & { licenseKey?: string }) {
-    return this.transactionsService.getMonthlyGoal(req.licenseKey);
-  }
-
-  @Get('stats/top-products')
-  getTopProducts(
-    @Query('limit') limit?: string,
-    @Req() req?: Request & { licenseKey?: string },
-  ) {
-    return this.transactionsService.getTopProducts(
-      limit ? parseInt(limit) : 5,
-      req?.licenseKey,
-    );
-  }
-
-  @Get('stats/average-basket')
-  getAverageBasket(@Req() req: Request & { licenseKey?: string }) {
-    return this.transactionsService.getAverageBasket(req.licenseKey);
   }
 
   @Get('pending-sync')

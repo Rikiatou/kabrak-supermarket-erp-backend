@@ -1,15 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { BatchesService } from '../batches/batches.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private prisma: PrismaService, private batchesService: BatchesService) {}
+  constructor(private prisma: PrismaService) {}
 
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
-  async create(createTransactionDto: CreateTransactionDto, licenseKey?: string) {
+  async create(createTransactionDto: CreateTransactionDto) {
     // Générer numéro de transaction
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
@@ -22,87 +21,74 @@ export class TransactionsService {
     });
     const transactionNumber = `TXN-${dateStr}-${String(count + 1).padStart(4, '0')}`;
 
-    // Create transaction (sequential queries — $transaction fails on Neon pooler)
-    // 1. Créer la transaction
-    const tx = await this.prisma.transaction.create({
-      data: {
-        transactionNumber,
-        cashierId: createTransactionDto.cashierId,
-        registerId: createTransactionDto.registerId,
-        subtotal: createTransactionDto.subtotal,
-        discount: createTransactionDto.discount || 0,
-        tax: createTransactionDto.tax,
-        total: createTransactionDto.total,
-        paymentMethod: createTransactionDto.paymentMethod,
-        cashGiven: createTransactionDto.cashGiven,
-        change: createTransactionDto.change,
-        customerId: createTransactionDto.customerId,
-        status: 'completed',
-        syncStatus: 'pending',
-        ...(licenseKey ? { licenseKey } : {}),
-        items: {
-          create: createTransactionDto.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount || 0,
-            tax: item.tax,
-            total: item.total,
-          })),
-        },
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
+    // Transaction dans une transaction DB (atomicité)
+    const transaction = await this.prisma.$transaction(async (prisma) => {
+      // 1. Créer la transaction
+      const tx = await prisma.transaction.create({
+        data: {
+          transactionNumber,
+          cashierId: createTransactionDto.cashierId,
+          registerId: createTransactionDto.registerId,
+          subtotal: createTransactionDto.subtotal,
+          discount: createTransactionDto.discount || 0,
+          tax: createTransactionDto.tax,
+          total: createTransactionDto.total,
+          paymentMethod: createTransactionDto.paymentMethod,
+          cashGiven: createTransactionDto.cashGiven,
+          change: createTransactionDto.change,
+          customerId: createTransactionDto.customerId,
+          status: 'completed',
+          syncStatus: 'pending', // À synchroniser avec le cloud
+          items: {
+            create: createTransactionDto.items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount || 0,
+              tax: item.tax,
+              total: item.total,
+            })),
           },
         },
-        cashier: true,
-      },
-    });
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          cashier: true,
+        },
+      });
 
-    // 2. Mettre à jour le stock pour chaque article
-    const stockErrors: string[] = [];
-    for (const item of createTransactionDto.items) {
-      try {
-        // Empêcher le stock affiché de devenir négatif (chiffres migrés non fiables)
-        const currentProduct = await this.prisma.product.findUnique({
+      // 2. Mettre à jour le stock pour chaque article
+      for (const item of createTransactionDto.items) {
+        // Décrémenter le stock
+        await prisma.product.update({
           where: { id: item.productId },
-          select: { stock: true },
-        });
-        const newStock = Math.max(0, (currentProduct?.stock ?? 0) - item.quantity);
-        await this.prisma.product.update({
-          where: { id: item.productId },
-          data: { stock: newStock },
+          data: {
+            stock: {
+              decrement: item.quantity,
+            },
+          },
         });
 
-        // Décrémenter le lot correspondant (FIFO — lot qui expire le plus tôt)
-        await this.batchesService.decrementFIFO(item.productId, item.quantity).catch(() => {});
-
-        await this.prisma.stockMovement.create({
+        // Créer un mouvement de stock
+        await prisma.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'out',
             quantity: -item.quantity,
             reason: 'sale',
-            reference: tx.transactionNumber,
-            notes: item.discount > 0 ? `Remise article: ${item.discount}` : undefined,
-            createdBy: createTransactionDto.cashierId,
+            reference: tx.id,
             syncStatus: 'pending',
           },
         });
-      } catch (e) {
-        console.error(`Stock update failed for product ${item.productId}:`, e);
-        stockErrors.push(item.productId);
       }
-    }
 
-    // 3. Mettre à jour les points fidélité si client
-    let loyaltyError = false;
-    if (createTransactionDto.customerId) {
-      try {
-        const pointsEarned = Math.floor(createTransactionDto.total / 100);
-        await this.prisma.customer.update({
+      // 3. Mettre à jour les points fidélité si client
+      if (createTransactionDto.customerId) {
+        const pointsEarned = Math.floor(createTransactionDto.total / 100); // 1 point = 100 FCFA
+        await prisma.customer.update({
           where: { id: createTransactionDto.customerId },
           data: {
             points: { increment: pointsEarned },
@@ -110,7 +96,7 @@ export class TransactionsService {
           },
         });
 
-        await this.prisma.loyaltyHistory.create({
+        await prisma.loyaltyHistory.create({
           data: {
             customerId: createTransactionDto.customerId,
             points: pointsEarned,
@@ -118,37 +104,21 @@ export class TransactionsService {
             reference: tx.id,
           },
         });
-      } catch (e) {
-        console.error(`Loyalty update failed for customer ${createTransactionDto.customerId}:`, e);
-        loyaltyError = true;
       }
-    }
 
-    const transaction = tx;
-    // Attacher les avertissements pour que le frontend puisse les afficher
-    (transaction as any)._warnings = {
-      stockErrors,
-      loyaltyError,
-    };
+      return tx;
+    });
 
     return transaction;
   }
 
   // Liste paginée
-  async findAll(page: number = 1, limit: number = 50, cashierId?: string, licenseKey?: string, startDate?: Date, endDate?: Date) {
+  async findAll(page: number = 1, limit: number = 50, cashierId?: string) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
     if (cashierId) {
       where.cashierId = cashierId;
-    }
-    if (licenseKey) {
-      where.OR = [{ licenseKey }, { licenseKey: null }];
-    }
-    if (startDate || endDate) {
-      where.date = {};
-      if (startDate) where.date.gte = startDate;
-      if (endDate) where.date.lte = new Date(endDate.getTime() + 23 * 60 * 60 * 1000 + 59 * 60 * 1000 + 59000); // end of day
     }
 
     const [transactions, total] = await Promise.all([
@@ -225,24 +195,21 @@ export class TransactionsService {
   }
 
   // Statistiques du jour
-  async getTodayStats(licenseKey?: string) {
+  async getTodayStats() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const [transactions, totalRevenue, totalItems] = await Promise.all([
       this.prisma.transaction.count({
         where: {
           date: { gte: today },
           status: 'completed',
-          ...tenantFilter,
         },
       }),
       this.prisma.transaction.aggregate({
         where: {
           date: { gte: today },
           status: 'completed',
-          ...tenantFilter,
         },
         _sum: { total: true },
       }),
@@ -251,7 +218,6 @@ export class TransactionsService {
           transaction: {
             date: { gte: today },
             status: 'completed',
-            ...tenantFilter,
           },
         },
         _sum: { quantity: true },
@@ -269,27 +235,24 @@ export class TransactionsService {
   }
 
   // Stats d'hier (pour comparaison dashboard)
-  async getYesterdayStats(licenseKey?: string) {
+  async getYesterdayStats() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const [transactions, totalRevenue, totalItems] = await Promise.all([
       this.prisma.transaction.count({
         where: {
           date: { gte: yesterday, lt: todayStart },
           status: 'completed',
-          ...tenantFilter,
         },
       }),
       this.prisma.transaction.aggregate({
         where: {
           date: { gte: yesterday, lt: todayStart },
           status: 'completed',
-          ...tenantFilter,
         },
         _sum: { total: true },
       }),
@@ -298,7 +261,6 @@ export class TransactionsService {
           transaction: {
             date: { gte: yesterday, lt: todayStart },
             status: 'completed',
-            ...tenantFilter,
           },
         },
         _sum: { quantity: true },
@@ -316,10 +278,9 @@ export class TransactionsService {
   }
 
   // Ventes des 7 derniers jours (pour graphique de tendance)
-  async getWeekTrend(licenseKey?: string) {
+  async getWeekTrend() {
     const days: Array<{ date: string; label: string; revenue: number; transactions: number }> = [];
     const dayLabels = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     for (let i = 6; i >= 0; i--) {
       const start = new Date();
@@ -330,10 +291,10 @@ export class TransactionsService {
 
       const [count, revenue] = await Promise.all([
         this.prisma.transaction.count({
-          where: { date: { gte: start, lt: end }, status: 'completed', ...tenantFilter },
+          where: { date: { gte: start, lt: end }, status: 'completed' },
         }),
         this.prisma.transaction.aggregate({
-          where: { date: { gte: start, lt: end }, status: 'completed', ...tenantFilter },
+          where: { date: { gte: start, lt: end }, status: 'completed' },
           _sum: { total: true },
         }),
       ]);
@@ -354,42 +315,40 @@ export class TransactionsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const registers = await this.prisma.cashRegister.findMany();
-
-    // Fetch transactions separately since FK relation was removed
-    const result = [];
-    for (const reg of registers) {
-      const transactions = await this.prisma.transaction.findMany({
-        where: {
-          registerId: reg.id,
-          date: { gte: today },
-          status: 'completed',
+    const registers = await this.prisma.cashRegister.findMany({
+      include: {
+        transactions: {
+          where: {
+            date: { gte: today },
+            status: 'completed',
+          },
+          select: {
+            total: true,
+            id: true,
+          },
         },
-        select: { total: true, id: true },
-      });
-      result.push({
-        id: reg.id,
-        name: reg.name,
-        code: reg.code,
-        status: reg.status,
-        transactionsCount: transactions.length,
-        revenue: transactions.reduce((sum, t) => sum + t.total, 0),
-      });
-    }
-    return result;
+      },
+    });
+
+    return registers.map((reg) => ({
+      id: reg.id,
+      name: reg.name,
+      code: reg.code,
+      status: reg.status,
+      transactionsCount: reg.transactions.length,
+      revenue: reg.transactions.reduce((sum, t) => sum + t.total, 0),
+    }));
   }
 
   // Ventes par heure (pour graphique dashboard)
-  async getSalesByHour(licenseKey?: string) {
+  async getSalesByHour() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tenantFilter = licenseKey ? { licenseKey } : {};
 
     const transactions = await this.prisma.transaction.findMany({
       where: {
         date: { gte: today },
         status: 'completed',
-        ...tenantFilter,
       },
       select: {
         date: true,
@@ -470,22 +429,23 @@ export class TransactionsService {
     const transaction = await this.findOne(id);
 
     if (transaction.status === 'refunded') {
-      throw new BadRequestException('Transaction déjà remboursée');
+      throw new Error('Transaction déjà remboursée');
     }
 
-    // Refund — sequential queries ($transaction fails on Neon pooler)
-    const updated = await this.prisma.transaction.update({
-      where: { id },
-      data: {
-        status: 'refunded',
-        syncStatus: 'pending',
-      },
-    });
+    // Rembourser dans une transaction DB
+    return this.prisma.$transaction(async (prisma) => {
+      // 1. Marquer comme remboursée
+      const updated = await prisma.transaction.update({
+        where: { id },
+        data: {
+          status: 'refunded',
+          syncStatus: 'pending', // Re-sync
+        },
+      });
 
-    // Remettre en stock
-    for (const item of transaction.items) {
-      try {
-        await this.prisma.product.update({
+      // 2. Remettre en stock
+      for (const item of transaction.items) {
+        await prisma.product.update({
           where: { id: item.productId },
           data: {
             stock: {
@@ -494,123 +454,19 @@ export class TransactionsService {
           },
         });
 
-        await this.prisma.stockMovement.create({
+        await prisma.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'in',
             quantity: item.quantity,
             reason: 'refund',
             reference: id,
-            createdBy: transaction.cashierId,
             syncStatus: 'pending',
           },
         });
-      } catch (e) {
-        console.error(`Stock restore failed for product ${item.productId}:`, e);
       }
-    }
 
-    return updated;
-  }
-
-  // Objectif mensuel (CA du mois vs objectif)
-  async getMonthlyGoal(licenseKey?: string) {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    const tenantFilter = licenseKey ? { licenseKey } : {};
-
-    const result = await this.prisma.transaction.aggregate({
-      where: {
-        date: { gte: startOfMonth, lte: endOfMonth },
-        status: 'completed',
-        ...tenantFilter,
-      },
-      _sum: { total: true },
-      _count: true,
+      return updated;
     });
-
-    const current = result._sum.total || 0;
-    const goal = 500000; // Objectif fixe pour l'instant (TODO: rendre configurable)
-    const progress = goal > 0 ? Math.round((current / goal) * 100) : 0;
-
-    return {
-      current,
-      goal,
-      progress,
-      transactions: result._count,
-      remaining: Math.max(0, goal - current),
-    };
-  }
-
-  // Top produits vendus (ce mois)
-  async getTopProducts(limit: number = 5, licenseKey?: string) {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const tenantFilter = licenseKey ? { licenseKey } : {};
-
-    const items = await this.prisma.transactionItem.groupBy({
-      by: ['productId'],
-      where: {
-        transaction: {
-          date: { gte: startOfMonth },
-          status: 'completed',
-          ...tenantFilter,
-        },
-      },
-      _sum: {
-        quantity: true,
-        total: true,
-      },
-      orderBy: {
-        _sum: {
-          quantity: 'desc',
-        },
-      },
-      take: limit,
-    });
-
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: items.map((i) => i.productId) } },
-      select: { id: true, name: true, sku: true, price: true },
-    });
-
-    return items.map((item) => {
-      const product = products.find((p) => p.id === item.productId);
-      return {
-        productId: item.productId,
-        productName: product?.name || 'Produit inconnu',
-        sku: product?.sku || '',
-        quantity: item._sum.quantity || 0,
-        revenue: item._sum.total || 0,
-      };
-    });
-  }
-
-  // Panier moyen (aujourd'hui)
-  async getAverageBasket(licenseKey?: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tenantFilter = licenseKey ? { licenseKey } : {};
-
-    const result = await this.prisma.transaction.aggregate({
-      where: {
-        date: { gte: today },
-        status: 'completed',
-        ...tenantFilter,
-      },
-      _sum: { total: true },
-      _count: true,
-    });
-
-    const total = result._sum.total || 0;
-    const count = result._count || 0;
-    const average = count > 0 ? Math.round(total / count) : 0;
-
-    return {
-      average,
-      total,
-      transactions: count,
-    };
   }
 }
