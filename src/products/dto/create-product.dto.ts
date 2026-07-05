@@ -57,4 +57,9 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  // Date d'expiration (ISO string) — optionnelle, surtout pour les produits périssables
+  @IsString()
+  @IsOptional()
+  expiryDate?: string;
 }

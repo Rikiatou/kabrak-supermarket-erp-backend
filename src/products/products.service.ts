@@ -11,24 +11,41 @@ export class ProductsService {
 
   // Créer un produit
   async create(createProductDto: CreateProductDto) {
-    // Vérifier si SKU ou barcode existe déjà
-    const existing = await this.prisma.product.findFirst({
-      where: {
-        OR: [
-          { sku: createProductDto.sku },
-          { barcode: createProductDto.barcode },
-        ],
-      },
-    });
+    // Ne vérifier les doublons QUE sur les valeurs réellement fournies
+    // (sinon un OR avec des undefined matche n'importe quel produit → faux "existe déjà")
+    const orConditions: any[] = [];
+    if (createProductDto.sku) orConditions.push({ sku: createProductDto.sku });
+    if (createProductDto.barcode) orConditions.push({ barcode: createProductDto.barcode });
 
-    if (existing) {
-      throw new ConflictException(
-        `Produit avec SKU "${createProductDto.sku}" ou barcode "${createProductDto.barcode}" existe déjà`,
-      );
+    if (orConditions.length > 0) {
+      const existing = await this.prisma.product.findFirst({
+        where: { OR: orConditions },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `Produit avec SKU "${createProductDto.sku}" ou barcode "${createProductDto.barcode}" existe déjà`,
+        );
+      }
+    }
+
+    // SKU et barcode sont obligatoires et uniques en base.
+    // Si le stockiste n'en fournit pas (produit sans code-barres), on en génère
+    // un unique automatiquement pour permettre la création.
+    const uniqueSuffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
+    const data: any = {
+      ...createProductDto,
+      sku: createProductDto.sku || `SKU-${uniqueSuffix}`,
+      barcode: createProductDto.barcode || `AUTO-${uniqueSuffix}`,
+    };
+    // Convertir expiryDate (string ISO) en Date pour Prisma
+    if (createProductDto.expiryDate) {
+      data.expiryDate = new Date(createProductDto.expiryDate);
+    } else {
+      delete data.expiryDate;
     }
 
     return this.prisma.product.create({
-      data: createProductDto as any,
+      data,
       include: {
         supplier: true,
       },
@@ -169,19 +186,15 @@ export class ProductsService {
     // Vérifier si existe
     await this.findOne(id);
 
-    // Vérifier unicité SKU/barcode si modifiés
-    if (updateProductDto.sku || updateProductDto.barcode) {
+    // Vérifier unicité SKU/barcode si modifiés (uniquement sur les valeurs fournies)
+    const orConditions: any[] = [];
+    if (updateProductDto.sku) orConditions.push({ sku: updateProductDto.sku });
+    if (updateProductDto.barcode) orConditions.push({ barcode: updateProductDto.barcode });
+
+    if (orConditions.length > 0) {
       const existing = await this.prisma.product.findFirst({
         where: {
-          AND: [
-            { id: { not: id } },
-            {
-              OR: [
-                updateProductDto.sku ? { sku: updateProductDto.sku } : {},
-                updateProductDto.barcode ? { barcode: updateProductDto.barcode } : {},
-              ],
-            },
-          ],
+          AND: [{ id: { not: id } }, { OR: orConditions }],
         },
       });
 
@@ -190,9 +203,17 @@ export class ProductsService {
       }
     }
 
+    // Convertir expiryDate (string ISO) en Date pour Prisma
+    const data: any = { ...updateProductDto };
+    if (updateProductDto.expiryDate) {
+      data.expiryDate = new Date(updateProductDto.expiryDate);
+    } else if ('expiryDate' in data) {
+      delete data.expiryDate;
+    }
+
     return this.prisma.product.update({
       where: { id },
-      data: updateProductDto,
+      data,
       include: { supplier: true },
     });
   }

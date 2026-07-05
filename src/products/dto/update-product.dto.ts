@@ -64,4 +64,8 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  expiryDate?: string;
 }
