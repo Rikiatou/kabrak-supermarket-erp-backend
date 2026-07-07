@@ -22,18 +22,20 @@ import { AiModule } from './ai/ai.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CronModule } from './cron/cron.module';
+import { LicensesModule } from './licenses/licenses.module';
 
 @Module({
   imports: [
-    // Configuration
+    // Configuration — charge .env.local en dev, variables d'env en production
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.local',
+      envFilePath: process.env.NODE_ENV === 'production' ? '.env' : '.env.local',
     }),
 
     // Modules
     DatabaseModule,
     AuthModule,
+    LicensesModule,
     ProductsModule,
     TransactionsModule,
     StockModule,
@@ -49,6 +51,7 @@ import { CronModule } from './cron/cron.module';
     AiModule,
     InvoicesModule,
     NotificationsModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [

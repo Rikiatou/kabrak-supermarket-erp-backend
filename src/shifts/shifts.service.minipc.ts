@@ -57,16 +57,24 @@ export class ShiftsService {
     });
   }
 
-  async findAll(page: number = 1, limit: number = 100) {
+  async findAll(page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
-    const shifts = await this.prisma.shift.findMany({
-      orderBy: { openedAt: 'desc' },
-      skip,
-      take: limit,
-    });
+    const [shifts, total] = await Promise.all([
+      this.prisma.shift.findMany({
+        orderBy: { openedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.shift.count(),
+    ]);
 
-    // Retourner un array direct (le frontend fait .filter() dessus)
-    return shifts;
+    return {
+      data: shifts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Z-Report: rapport de clôture de caisse

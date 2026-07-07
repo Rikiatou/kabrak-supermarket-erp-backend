@@ -1,0 +1,644 @@
+// Schéma Prisma optimisé pour TRÈS GRAND SUPERMARCHÉ
+// 40 000+ produits, multi-caisses, offline-first
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// PRODUITS (40K+)
+// ========================================
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  barcode     String   @unique
+  name        String
+  description String?
+  category    String
+  subCategory String?
+  brand       String?
+  
+  // Prix (en centimes FCFA pour éviter les float)
+  price       Int      // Prix vente
+  costPrice   Int      // Prix achat
+  taxRate     Float    @default(15.5) // TVA 15.5%
+
+  // Markdown / Promotion (destockage, péremption, promo)
+  markdownPrice    Int?      // Prix réduit (si null, pas de markdown)
+  markdownReason   String?   // "expiry", "near_expiry", "clearance", "promo"
+  markdownNote     String?   // Note libre du manager
+  markdownStartsAt DateTime? // Début du markdown
+  markdownExpiresAt DateTime? // Fin du markdown (auto-restauration du prix)
+
+  // Stock
+  stock       Int      @default(0)
+  minStock    Int      @default(10)
+  maxStock    Int?
+  unit        String   // "pièce", "kg", "litre", "carton"
+
+  // Dates
+  expiryDate  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+
+  // Métadonnées
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  
+  // Relations
+  transactionItems TransactionItem[]
+  stockMovements   StockMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
+  invoiceItems      InvoiceItem[]
+  
+  // INDEX CRITIQUES pour performance avec 40K produits
+  @@index([barcode])                    // Scan caisse ultra-rapide
+  @@index([sku])                        // Recherche par référence
+  @@index([category, subCategory])      // Filtres catégories
+  @@index([name])                       // Recherche texte
+  @@index([expiryDate])                 // Alertes expiration
+  @@index([stock, minStock])            // Alertes stock faible
+  @@index([isActive])                   // Produits actifs seulement
+  @@index([supplierId])                 // Produits par fournisseur
+  @@index([markdownPrice])              // Produits en markdown actif
+  
+  @@map("products")
+}
+
+// ========================================
+// FOURNISSEURS
+// ========================================
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String
+  contact       String
+  phone         String
+  email         String?
+  address       String?
+  paymentTerms  String   @default("30 jours")
+  rating        Float    @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+  
+  @@index([name])
+  @@index([isActive])
+  
+  @@map("suppliers")
+}
+
+// ========================================
+// TRANSACTIONS (VENTES)
+// ========================================
+model Transaction {
+  id            String   @id @default(cuid())
+  transactionNumber String @unique // Format: TXN-20260618-0001
+  date          DateTime @default(now())
+  
+  // Caisse & Employé
+  cashierId     String
+  cashier       Employee @relation(fields: [cashierId], references: [id])
+  registerId    String?
+  register      CashRegister? @relation(fields: [registerId], references: [id])
+  
+  // Montants (en centimes FCFA)
+  subtotal      Int
+  discount      Int      @default(0)
+  tax           Int
+  total         Int
+  
+  // Paiement
+  paymentMethod String   // "cash", "card", "mobile", "mixed"
+  cashGiven     Int?     // Si cash
+  change        Int?     // Si cash
+  
+  // Client (optionnel - fidélité)
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  
+  // Statut
+  status        String   @default("completed") // "completed", "refunded", "cancelled"
+  
+  // Synchronisation (OFFLINE-FIRST)
+  syncStatus    String   @default("pending") // "pending", "synced", "failed"
+  syncedAt      DateTime?
+  syncError     String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  items         TransactionItem[]
+  
+  @@index([date])
+  @@index([cashierId])
+  @@index([registerId])
+  @@index([status])
+  @@index([syncStatus])           // CRITIQUE pour offline-first
+  @@index([transactionNumber])
+  @@index([customerId])
+  
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id            String   @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  
+  quantity      Int
+  unitPrice     Int      // Prix au moment de la vente
+  discount      Int      @default(0)
+  tax           Int
+  total         Int
+  
+  @@index([transactionId])
+  @@index([productId])
+  
+  @@map("transaction_items")
+}
+
+// ========================================
+// CAISSES (MULTI-CAISSES)
+// ========================================
+model CashRegister {
+  id          String   @id @default(cuid())
+  name        String   // "Caisse 1", "Caisse 2"
+  code        String   @unique // "REG001", "REG002"
+  status      String   @default("closed") // "open", "closed"
+  
+  // Fonds de caisse
+  openingCash Int      @default(0)
+  currentCash Int      @default(0)
+  
+  location    String?  // "Entrée principale", "Sortie"
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactions Transaction[]
+  shifts       Shift[]
+  schedules    Schedule[]
+  
+  @@index([code])
+  @@index([status])
+  @@index([isActive])
+  
+  @@map("cash_registers")
+}
+
+model Shift {
+  id            String   @id @default(cuid())
+  
+  registerId    String
+  register      CashRegister @relation(fields: [registerId], references: [id])
+  
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  
+  openingCash   Int
+  closingCash   Int?
+  expectedCash  Int?
+  difference    Int?     // Écart de caisse
+  
+  status        String   @default("open") // "open", "closed"
+  notes         String?
+  employeeName  String?
+  registerName  String?
+  
+  @@index([registerId])
+  @@index([employeeId])
+  @@index([openedAt])
+  @@index([status])
+  
+  @@map("shifts")
+}
+
+// ========================================
+// EMPLOYÉS
+// ========================================
+model Employee {
+  id            String   @id @default(cuid())
+  employeeNumber String  @unique
+  firstName     String
+  lastName      String
+  role          String   // "manager", "cashier", "stockist", "supervisor"
+  department    String
+  
+  phone         String
+  email         String?
+  
+  hireDate      DateTime
+  status        String   @default("active") // "active", "on_leave", "inactive"
+  
+  // Auth (simple pour commencer)
+  pin           String?  // PIN 4 chiffres pour login caisse
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  transactions  Transaction[]
+  shifts        Shift[]
+  schedules     Schedule[]
+  
+  @@index([employeeNumber])
+  @@index([role])
+  @@index([status])
+  
+  @@map("employees")
+}
+
+// ========================================
+// MOUVEMENTS DE STOCK
+// ========================================
+model StockMovement {
+  id          String   @id @default(cuid())
+  
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  type        String   // "in" (entrée), "out" (sortie), "adjustment", "loss"
+  quantity    Int      // Positif = entrée, Négatif = sortie
+  
+  reason      String?  // "sale", "purchase", "expiry", "damage", "theft", "adjustment"
+  reference   String?  // ID transaction, bon de commande, etc.
+  
+  notes       String?
+  createdBy   String?  // ID employé
+  
+  // Synchronisation
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([syncStatus])
+  
+  @@map("stock_movements")
+}
+
+// ========================================
+// COMMANDES FOURNISSEURS
+// ========================================
+model PurchaseOrder {
+  id           String   @id @default(cuid())
+  orderNumber  String   @unique
+  
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  
+  date         DateTime @default(now())
+  expectedDate DateTime
+  receivedDate DateTime?
+  
+  total        Int
+  status       String   @default("draft") // "draft", "sent", "received", "cancelled"
+  
+  notes        String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  items        PurchaseOrderItem[]
+  
+  @@index([supplierId])
+  @@index([status])
+  @@index([date])
+  @@index([orderNumber])
+  
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitCost        Int
+  total           Int
+
+  receivedQuantity Int?
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+
+  @@map("purchase_order_items")
+}
+
+// ========================================
+// CLIENTS & FIDÉLITÉ
+// ========================================
+model Customer {
+  id          String   @id @default(cuid())
+  customerNumber String @unique
+  
+  firstName   String
+  lastName    String
+  phone       String   @unique
+  email       String?
+  
+  // Fidélité
+  points      Int      @default(0)
+  totalSpent  Int      @default(0)
+  tier        String   @default("bronze") // "bronze", "silver", "gold", "platinum"
+  
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactions    Transaction[]
+  loyaltyHistory  LoyaltyHistory[]
+  invoices        Invoice[]
+  
+  @@index([phone])
+  @@index([customerNumber])
+  @@index([tier])
+  
+  @@map("customers")
+}
+
+model LoyaltyHistory {
+  id          String   @id @default(cuid())
+  
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  
+  points      Int      // Positif = gagné, Négatif = dépensé
+  reason      String   // "purchase", "reward_redeemed", "bonus"
+  reference   String?  // ID transaction
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([customerId])
+  @@index([createdAt])
+  
+  @@map("loyalty_history")
+}
+
+// ========================================
+// SYNCHRONISATION (OFFLINE-FIRST)
+// ========================================
+model SyncLog {
+  id          String   @id @default(cuid())
+  
+  entityType  String   // "transaction", "stock_movement", "product"
+  entityId    String
+  action      String   // "create", "update", "delete"
+  
+  status      String   // "pending", "synced", "failed"
+  error       String?
+  
+  attempts    Int      @default(0)
+  lastAttempt DateTime?
+  
+  createdAt   DateTime @default(now())
+  syncedAt    DateTime?
+  
+  @@index([status])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  
+  @@map("sync_logs")
+}
+
+// ========================================
+// COMPTABILITÉ - DÉPENSES
+// ========================================
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  category    String   // "rent", "utilities", "salaries", "supplies", "transport", "taxes", "other"
+  description String
+  amount      Int
+  paymentMethod String @default("cash")
+  supplier    String?
+  status      String   @default("paid") // "paid", "pending"
+  createdAt   DateTime @default(now())
+  
+  @@index([date])
+  @@index([category])
+  @@map("expenses")
+}
+
+// ========================================
+// COMPTABILITÉ - REVENUS
+// ========================================
+model Revenue {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  category    String   // "sales", "services", "other"
+  description String
+  amount      Int
+  createdAt   DateTime @default(now())
+  
+  @@index([date])
+  @@index([category])
+  @@map("revenues")
+}
+
+// ========================================
+// FACTURES A4 (CLIENTS PROFESSIONNELS)
+// ========================================
+model Invoice {
+  id          String   @id @default(cuid())
+  number      String   @unique // "FAC-2026-0001"
+  
+  // Client (pas forcément un Customer fidélité)
+  clientName  String
+  clientPhone String
+  clientEmail String?
+  clientAddress String?
+  
+  // Lien optionnel avec un client fidélité
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  
+  date        DateTime @default(now())
+  dueDate     DateTime?
+  
+  subtotal    Int
+  taxRate     Float    @default(15.5)
+  tax         Int
+  total       Int
+  
+  // Suivi paiements échelonnés
+  paidAmount  Int      @default(0)
+  balance     Int      @default(0) // total - paidAmount (calculé)
+  
+  status      String   @default("draft") // "draft", "sent", "partial", "paid", "overdue", "cancelled"
+  paidAt      DateTime?
+  paymentMethod String? // "cash", "card", "mobile", "transfer"
+  
+  notes       String?
+  
+  items       InvoiceItem[]
+  payments    InvoicePayment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([number])
+  @@index([status])
+  @@index([date])
+  @@index([customerId])
+  @@index([clientName])
+  
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  description String
+  quantity    Int
+  unitPrice   Int
+  total       Int
+  
+  // Lien optionnel avec un produit
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  
+  @@index([invoiceId])
+  @@index([productId])
+  
+  @@map("invoice_items")
+}
+
+// ========================================
+// VERSEMENTS FACTURE (PAIEMENTS ÉCHÉLONNÉS)
+// ========================================
+model InvoicePayment {
+  id          String   @id @default(cuid())
+  
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  amount      Int      // montant du versement
+  method      String   // "cash", "card", "mobile", "transfer"
+  date        DateTime @default(now())
+  note        String?  // ex: "1er versement", "acompte"
+  cashierId   String?  // employeeId who collected the payment (for Z-Report)
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([invoiceId])
+  @@index([date])
+  @@index([cashierId])
+  
+  @@map("invoice_payments")
+}
+
+// ========================================
+// PLANNING HEBDOMADAIRE DES CAISSES
+// ========================================
+model Schedule {
+  id          String   @id @default(cuid())
+  
+  employeeId  String
+  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  registerId  String
+  register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  
+  // Jour de la semaine: 0=dimanche, 1=lundi, ..., 6=samedi
+  dayOfWeek   Int
+  
+  // Créneau horaire
+  startTime   String   // "08:00"
+  endTime     String   // "17:00"
+  
+  // Pause (optionnel)
+  breakStart  String?  // "12:00"
+  breakEnd    String?  // "13:00"
+  
+  isActive    Boolean  @default(true)
+  
+  notes       String?  // "Remplacement", "Heures supplémentaires", etc.
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([employeeId, dayOfWeek, startTime]) // Un employé ne peut pas être 2x au même créneau
+  @@index([employeeId])
+  @@index([registerId])
+  @@index([dayOfWeek])
+  
+  @@map("schedules")
+}
+
+// ========================================
+// RETOURS PRODUITS
+// ========================================
+model ProductReturn {
+  id                    String   @id @default(cuid())
+  licenseKey            String?
+  originalTransactionId String?
+  originalInvoiceId     String?
+  clientName            String?
+  returnDate            DateTime @default(now())
+  reason                String
+  resolution            String
+  totalRefunded         Int      @default(0)
+  refundMethod          String?
+  status                String   @default("completed")
+  note                  String?
+  createdBy             String?  // employeeId of cashier who processed the return
+
+  items                 ReturnItem[]
+
+  @@index([licenseKey])
+  @@index([originalTransactionId])
+  @@index([returnDate])
+  @@index([createdBy])
+
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                  String  @id @default(cuid())
+  returnId            String
+  productReturn       ProductReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  productId           String?
+  productName         String
+  quantity            Int
+  unitPrice           Int
+  total               Int
+  exchangeProductId   String?
+  exchangeProductName String?
+  exchangeTotal       Int?
+
+  @@index([returnId])
+  @@index([productId])
+
+  @@map("return_items")
+}
