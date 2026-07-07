@@ -225,14 +225,10 @@ model Shift {
   registerName  String?
   
   @@index([registerId])
-  
-  rgisterId])
-  @@index([e
-  @@index([registerId])
   @@index([employeeId])
   @@index([openedAt])
   @@index([status])
-  
+
   @@map("shifts")
 }
 
