@@ -225,6 +225,10 @@ model Shift {
   registerName  String?
   
   @@index([registerId])
+  
+  rgisterId])
+  @@index([e
+  @@index([registerId])
   @@index([employeeId])
   @@index([openedAt])
   @@index([status])
@@ -538,22 +542,22 @@ model InvoiceItem {
 // ========================================
 model InvoicePayment {
   id          String   @id @default(cuid())
-  
+
   invoiceId   String
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  
+
+  cashierId   String?  // employeeId who collected the payment (for Z-Report)
   amount      Int      // montant du versement
-  method      String   // "cash", "card", "mobile", "transfer"
+  method      String   // "cash", "card", "mobile", "orange", "transfer"
   date        DateTime @default(now())
   note        String?  // ex: "1er versement", "acompte"
-  cashierId   String?  // employeeId who collected the payment (for Z-Report)
-  
+
   createdAt   DateTime @default(now())
-  
+
+  @@index([cashierId])
   @@index([invoiceId])
   @@index([date])
-  @@index([cashierId])
-  
+
   @@map("invoice_payments")
 }
 
