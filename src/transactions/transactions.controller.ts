@@ -61,6 +61,21 @@ export class TransactionsController {
     return this.transactionsService.getMarginByCategory();
   }
 
+  @Get('stats/monthly-goal')
+  getMonthlyGoal() {
+    return this.transactionsService.getMonthlyGoal();
+  }
+
+  @Get('stats/top-products')
+  getTopProducts(@Query('limit') limit?: string) {
+    return this.transactionsService.getTopProducts(limit ? parseInt(limit) : 5);
+  }
+
+  @Get('stats/average-basket')
+  getAverageBasket() {
+    return this.transactionsService.getAverageBasket();
+  }
+
   @Get('pending-sync')
   findPendingSync() {
     return this.transactionsService.findPendingSync();
