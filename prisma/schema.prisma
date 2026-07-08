@@ -642,3 +642,90 @@ model ReturnItem {
 
   @@map("return_items")
 }
+
+// ========================================
+// LICENCES (SaaS Multi-Tenant)
+// ========================================
+model License {
+  id              String   @id @default(cuid())
+  licenseKey      String   @unique
+  clientName      String
+  clientEmail     String
+  clientPhone     String?
+  clientAddress   String?
+  type            String   @default("STANDARD") // "STANDARD", "MULTI_STORE"
+  maxStores       Int      @default(1)
+  durationMonths  Int      @default(12)
+  issuedAt        DateTime @default(now())
+  expiresAt       DateTime
+  renewedAt       DateTime?
+  lastCheckAt     DateTime?
+  activations     Int      @default(0)
+  status          String   @default("ACTIVE") // "ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"
+  internalNotes   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  config          ClientConfig?
+  stores          Store[]
+
+  @@index([licenseKey])
+  @@index([status])
+  @@index([clientEmail])
+
+  @@map("licenses")
+}
+
+model ClientConfig {
+  id              String   @id @default(cuid())
+  licenseId       String   @unique
+  license         License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  supermarketName     String   @default("KABRAK Supermarket")
+  supermarketSlogan   String?
+  primaryColor        String   @default("#2563eb")
+  logoUrl             String?
+
+  address             String?
+  phone               String?
+  email               String?
+  website             String?
+
+  receiptHeader       String?
+  receiptFooter       String   @default("Merci de votre visite !")
+  receiptShowLogo     Boolean  @default(true)
+  invoiceFooter       String?
+
+  currency            String   @default("FCFA")
+  taxRate             Float    @default(15.5)
+
+  enableLoyalty       Boolean  @default(true)
+  enableAutoPrint     Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("client_configs")
+}
+
+model Store {
+  id          String   @id @default(cuid())
+  licenseId   String
+  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  name        String
+  code        String   @unique
+  address     String?
+  phone       String?
+  city        String?
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([licenseId])
+  @@index([code])
+  @@index([isActive])
+
+  @@map("stores")
+}

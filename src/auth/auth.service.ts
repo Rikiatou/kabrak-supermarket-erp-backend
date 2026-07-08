@@ -96,5 +96,3 @@ export class AuthService {
     });
   }
 }
-  }
-}

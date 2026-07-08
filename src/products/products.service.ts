@@ -417,4 +417,78 @@ export class ProductsService {
       })),
     };
   }
+
+  // ========================================
+  // BESTSELLERS & CATÉGORIES
+  // ========================================
+
+  // Top produits vendus (pour cache local du POS)
+  async getBestsellers(limit: number = 200) {
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    const items = await this.prisma.transactionItem.groupBy({
+      by: ['productId'],
+      where: {
+        transaction: {
+          date: { gte: startOfMonth },
+          status: 'completed',
+        },
+      },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: limit,
+    });
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: items.map((i) => i.productId) } },
+      select: {
+        id: true,
+        sku: true,
+        barcode: true,
+        name: true,
+        price: true,
+        stock: true,
+        category: true,
+        unit: true,
+        markdownPrice: true,
+        imageUrl: true,
+        isActive: true,
+      },
+    });
+
+    // Trier selon l'ordre des bestsellers
+    const sorted = items
+      .map((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) return null;
+        return { ...product, soldQuantity: item._sum.quantity || 0 };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+
+    return sorted;
+  }
+
+  // Lister toutes les catégories distinctes
+  async getCategories() {
+    const result = await this.prisma.product.findMany({
+      where: { isActive: true },
+      select: { category: true, subCategory: true },
+      distinct: ['category', 'subCategory'],
+    });
+
+    // Grouper par catégorie
+    const categories: Record<string, string[]> = {};
+    for (const r of result) {
+      if (!categories[r.category]) categories[r.category] = [];
+      if (r.subCategory && !categories[r.category].includes(r.subCategory)) {
+        categories[r.category].push(r.subCategory);
+      }
+    }
+
+    return Object.entries(categories).map(([name, subs]) => ({
+      name,
+      subCategories: subs,
+      productCount: 0,
+    }));
+  }
 }
