@@ -1,0 +1,14 @@
+Fix: mono-store config, Z-Report corrections, build fixes
+
+- Remove multi-tenant modules (batches, licenses, admin, returns) from tsconfig
+- Fix auth.service: remove licenseKey references (mono-store)
+- Fix stock.service: remove employee include (not a relation)
+- Fix products.service: cast DTO for Prisma compatibility
+- Fix transactions.module: remove BatchesModule dependency
+- Update Z-Report: include returns + invoice payments
+- Add cashierId to InvoicePayment
+- Add employeeName/registerName to Shift model
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>
