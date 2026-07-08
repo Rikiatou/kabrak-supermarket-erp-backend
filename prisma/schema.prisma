@@ -59,7 +59,8 @@ model Product {
   stockMovements   StockMovement[]
   purchaseOrderItems PurchaseOrderItem[]
   invoiceItems      InvoiceItem[]
-  
+  batches           ProductBatch[]
+
   // INDEX CRITIQUES pour performance avec 40K produits
   @@index([barcode])                    // Scan caisse ultra-rapide
   @@index([sku])                        // Recherche par référence
@@ -87,6 +88,7 @@ model Supplier {
   paymentTerms  String   @default("30 jours")
   rating        Float    @default(0)
   isActive      Boolean  @default(true)
+  licenseKey    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -95,7 +97,8 @@ model Supplier {
   
   @@index([name])
   @@index([isActive])
-  
+  @@index([licenseKey])
+
   @@map("suppliers")
 }
 
@@ -251,18 +254,20 @@ model Employee {
   
   // Auth (simple pour commencer)
   pin           String?  // PIN 4 chiffres pour login caisse
-  
+  licenseKey    String?
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   transactions  Transaction[]
   shifts        Shift[]
   schedules     Schedule[]
-  
+
   @@index([employeeNumber])
   @@index([role])
   @@index([status])
-  
+  @@index([licenseKey])
+
   @@map("employees")
 }
 
@@ -728,4 +733,29 @@ model Store {
   @@index([isActive])
 
   @@map("stores")
+}
+
+// ========================================
+// LOTS DE PRODUITS (BATCHES / FIFO)
+// ========================================
+model ProductBatch {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+
+  batchNumber String?
+  quantity    Int
+  initialQty  Int
+  expiryDate  DateTime?
+  receivedDate DateTime @default(now())
+  licenseKey  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([expiryDate])
+  @@index([licenseKey])
+
+  @@map("product_batches")
 }

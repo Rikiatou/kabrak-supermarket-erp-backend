@@ -80,7 +80,6 @@ export class ReturnsService {
               reason: 'return',
               reference: ret.id,
               notes: `Retour client — ${dto.reason}`,
-              licenseKey: licenseKey || null,
             },
           })
           .catch(() => {});

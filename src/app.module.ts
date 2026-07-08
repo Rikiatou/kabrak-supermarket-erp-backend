@@ -23,6 +23,8 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CronModule } from './cron/cron.module';
 import { LicensesModule } from './licenses/licenses.module';
+import { ReturnsModule } from './returns/returns.module';
+import { BatchesModule } from './batches/batches.module';
 
 @Module({
   imports: [
@@ -52,6 +54,8 @@ import { LicensesModule } from './licenses/licenses.module';
     InvoicesModule,
     NotificationsModule,
     CronModule,
+    ReturnsModule,
+    BatchesModule,
   ],
   controllers: [AppController],
   providers: [
