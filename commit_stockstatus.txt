@@ -1,0 +1,8 @@
+fix: handle stockStatus filter in product search
+
+The search DTO accepted stockStatus but the service ignored it.
+Now filters: critical (stock=0), low (stock>0 but <=minStock), ok (stock>0).
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

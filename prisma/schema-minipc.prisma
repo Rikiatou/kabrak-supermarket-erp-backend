@@ -24,9 +24,14 @@ model Product {
   brand       String?
   
   // Prix (en centimes FCFA pour éviter les float)
-  price       Int      // Prix vente
+  price       Int      // Prix vente unitaire
   costPrice   Int      // Prix achat
   taxRate     Float    @default(15.5) // TVA 15.5%
+
+  // Vente en gros / packet
+  wholesalePrice Int?    // Prix de vente par packet (si null, pas de vente en gros)
+  packQuantity   Int?    // Nombre d'unités dans un packet (ex: 24 bouteilles par carton)
+  packBarcode    String? // Barcode du packet (si null, le packet n'a pas de code propre)
 
   // Markdown / Promotion (destockage, péremption, promo)
   markdownPrice    Int?      // Prix réduit (si null, pas de markdown)
@@ -59,6 +64,7 @@ model Product {
   stockMovements   StockMovement[]
   purchaseOrderItems PurchaseOrderItem[]
   invoiceItems      InvoiceItem[]
+  batches           ProductBatch[]
   
   // INDEX CRITIQUES pour performance avec 40K produits
   @@index([barcode])                    // Scan caisse ultra-rapide
@@ -641,4 +647,113 @@ model ReturnItem {
   @@index([productId])
 
   @@map("return_items")
+}
+
+// ========================================
+// LICENCE & CONFIG
+// ========================================
+model License {
+  id              String   @id @default(cuid())
+  licenseKey      String   @unique
+  clientName      String
+  clientEmail     String
+  clientPhone     String?
+  clientAddress   String?
+  type            String   @default("STANDARD")
+  maxStores       Int      @default(1)
+  durationMonths  Int      @default(12)
+  issuedAt        DateTime @default(now())
+  expiresAt       DateTime
+  renewedAt       DateTime?
+  lastCheckAt     DateTime?
+  activations     Int      @default(0)
+  status          String   @default("ACTIVE")
+  internalNotes   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  config          ClientConfig?
+  stores          Store[]
+
+  @@index([licenseKey])
+  @@index([status])
+  @@index([clientEmail])
+
+  @@map("licenses")
+}
+
+model ClientConfig {
+  id              String   @id @default(cuid())
+  licenseId       String   @unique
+  license         License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  supermarketName     String   @default("KABRAK Supermarket")
+  supermarketSlogan   String?
+  primaryColor        String   @default("#2563eb")
+  logoUrl             String?
+
+  address             String?
+  phone               String?
+  email               String?
+  website             String?
+
+  receiptHeader       String?
+  receiptFooter       String   @default("Merci de votre visite !")
+  receiptShowLogo     Boolean  @default(true)
+  invoiceFooter       String?
+
+  currency            String   @default("FCFA")
+  taxRate             Float    @default(15.5)
+
+  enableLoyalty       Boolean  @default(true)
+  enableAutoPrint     Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("client_configs")
+}
+
+model Store {
+  id          String   @id @default(cuid())
+  licenseId   String
+  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  name        String
+  code        String   @unique
+  address     String?
+  phone       String?
+  city        String?
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([licenseId])
+  @@index([code])
+  @@index([isActive])
+
+  @@map("stores")
+}
+
+model ProductBatch {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+
+  batchNumber String?
+  quantity    Int
+  initialQty  Int
+  expiryDate  DateTime?
+  receivedDate DateTime @default(now())
+  licenseKey  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([expiryDate])
+  @@index([licenseKey])
+
+  @@map("product_batches")
 }

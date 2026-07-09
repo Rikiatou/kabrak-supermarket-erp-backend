@@ -178,12 +178,21 @@ export class ProductsService {
     return product;
   }
 
-  // Trouver par barcode (pour caisse)
+  // Trouver par barcode (pour caisse) — cherche aussi par packBarcode
   async findByBarcode(barcode: string) {
-    const product = await this.prisma.product.findUnique({
+    // D'abord chercher par barcode unité
+    let product = await this.prisma.product.findUnique({
       where: { barcode },
       include: { supplier: true },
     });
+
+    // Si pas trouvé, chercher par packBarcode
+    if (!product) {
+      product = await this.prisma.product.findFirst({
+        where: { packBarcode: barcode },
+        include: { supplier: true },
+      });
+    }
 
     if (!product) {
       throw new NotFoundException(`Produit avec barcode "${barcode}" non trouvé`);

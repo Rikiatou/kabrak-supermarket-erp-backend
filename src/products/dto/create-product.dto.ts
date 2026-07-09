@@ -35,6 +35,20 @@ export class CreateProductDto {
   @Min(0)
   costPrice: number;
 
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  wholesalePrice?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  packQuantity?: number;
+
+  @IsString()
+  @IsOptional()
+  packBarcode?: string;
+
   @IsNumber()
   @IsOptional()
   taxRate?: number;

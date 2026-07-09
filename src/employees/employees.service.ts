@@ -67,6 +67,14 @@ export class EmployeesService {
     return this.prisma.employee.update({ where: { id }, data });
   }
 
+  async remove(id: string) {
+    // Soft delete: marquer comme inactif au lieu de supprimer (préserver l'historique)
+    return this.prisma.employee.update({
+      where: { id },
+      data: { status: 'inactive' },
+    });
+  }
+
   async getStats() {
     const [total, active, onLeave, byRole] = await Promise.all([
       this.prisma.employee.count(),

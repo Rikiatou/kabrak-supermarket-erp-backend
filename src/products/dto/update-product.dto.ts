@@ -39,6 +39,20 @@ export class UpdateProductDto {
   @IsOptional()
   costPrice?: number;
 
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  wholesalePrice?: number;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  packQuantity?: number;
+
+  @IsString()
+  @IsOptional()
+  packBarcode?: string;
+
   @IsNumber()
   @IsOptional()
   taxRate?: number;

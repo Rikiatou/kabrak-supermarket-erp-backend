@@ -24,9 +24,14 @@ model Product {
   brand       String?
   
   // Prix (en centimes FCFA pour éviter les float)
-  price       Int      // Prix vente
+  price       Int      // Prix vente unitaire
   costPrice   Int      // Prix achat
   taxRate     Float    @default(15.5) // TVA 15.5%
+
+  // Vente en gros / packet
+  wholesalePrice Int?    // Prix de vente par packet (si null, pas de vente en gros)
+  packQuantity   Int?    // Nombre d'unités dans un packet (ex: 24 bouteilles par carton)
+  packBarcode    String? // Barcode du packet (si null, le packet n'a pas de code propre)
 
   // Markdown / Promotion (destockage, péremption, promo)
   markdownPrice    Int?      // Prix réduit (si null, pas de markdown)

@@ -1,0 +1,11 @@
+fix: add ProductBatch model, licenseKey fields, BatchesModule + ReturnsModule
+
+- Add ProductBatch model to schema.prisma for FIFO batch tracking
+- Add licenseKey field to Employee and Supplier models for multi-tenant filtering
+- Add batches relation to Product model
+- Register BatchesModule and ReturnsModule in app.module.ts
+- Remove invalid licenseKey reference from returns.service.ts stock movement
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

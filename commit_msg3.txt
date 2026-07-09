@@ -1,0 +1,8 @@
+fix: add ReturnsModule to app.module + remove licenseKey from stock movement
+
+- ReturnsModule was missing from app.module.ts (returns endpoints returned 404)
+- Removed licenseKey from StockMovement create in returns.service.ts (field doesn't exist in schema)
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>
