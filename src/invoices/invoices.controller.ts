@@ -65,7 +65,7 @@ export class InvoicesController {
 
   @Post(':id/payments')
   addPayment(@Param('id') id: string, @Body() dto: CreatePaymentDto, @Req() req: any) {
-    return this.invoicesService.addPayment(id, dto, req.employeeId);
+    return this.invoicesService.addPayment(id, dto, req.user?.id);
   }
 
   @Patch(':id/status')

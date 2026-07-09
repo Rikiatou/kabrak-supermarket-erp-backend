@@ -118,7 +118,7 @@ export class InvoicesService {
   async addPayment(invoiceId: string, dto: CreatePaymentDto, cashierId?: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
-      include: { payments: true },
+      include: { payments: true, items: true },
     });
     if (!invoice) throw new NotFoundException(`Facture ${invoiceId} introuvable`);
 
@@ -145,6 +145,45 @@ export class InvoicesService {
         cashierId: cashierId || null,
       },
     });
+
+    // Créer une Transaction pour que le paiement compte dans le shift/Z-Report
+    if (cashierId) {
+      try {
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const txCount = await this.prisma.transaction.count({
+          where: {
+            date: { gte: new Date(today.setHours(0, 0, 0, 0)) },
+          },
+        });
+        const transactionNumber = `TXN-${dateStr}-${String(txCount + 1).padStart(4, '0')}`;
+
+        // Récupérer le registerId du shift actif de ce cashier
+        const activeShift = await this.prisma.shift.findFirst({
+          where: { employeeId: cashierId, status: 'open' },
+          orderBy: { openedAt: 'desc' },
+        });
+
+        await this.prisma.transaction.create({
+          data: {
+            transactionNumber,
+            cashierId,
+            registerId: activeShift?.registerId || null,
+            subtotal: dto.amount,
+            discount: 0,
+            tax: 0,
+            total: dto.amount,
+            paymentMethod: dto.method,
+            cashGiven: dto.method === 'cash' ? dto.amount : null,
+            change: 0,
+            status: 'completed',
+            syncStatus: 'pending',
+          },
+        });
+      } catch (e) {
+        console.error('Failed to create transaction for invoice payment:', e);
+      }
+    }
 
     // Recalculer paidAmount et balance
     const newPaidAmount = currentPaid + dto.amount;
