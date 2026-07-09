@@ -101,6 +101,7 @@ export class LicensesController {
   }
 
   // Mettre à jour la config client
+  @Public()
   @Patch(':licenseKey/config')
   async updateConfig(
     @Param('licenseKey') licenseKey: string,
