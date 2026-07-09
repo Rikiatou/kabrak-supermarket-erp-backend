@@ -20,5 +20,5 @@
     "esModuleInterop": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "src/batches", "src/licenses", "src/admin", "src/returns"]
+  "exclude": ["node_modules", "dist", "test", "src/batches", "src/admin", "src/returns"]
 }
