@@ -25,6 +25,11 @@ async function bootstrap() {
       return callback(null, true);
     }
 
+    // Réseau local (LAN) — caisses sur le même réseau (192.168.x, 10.x, 172.16-31.x)
+    if (/^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
     // Rejeter le reste
     return callback(new Error(`Origin not allowed: ${origin}`), false);
   };
