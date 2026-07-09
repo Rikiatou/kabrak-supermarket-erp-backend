@@ -82,7 +82,7 @@ export class ProductsService {
 
   // Recherche ultra-rapide (pour caisse)
   async search(searchDto: SearchProductDto) {
-    const { q, category, barcode, sku, page = 1, limit = 100 } = searchDto;
+    const { q, category, barcode, sku, stockStatus, page = 1, limit = 100 } = searchDto;
     const skip = (page - 1) * limit;
 
     // Recherche par barcode exact (scan caisse)
@@ -123,6 +123,17 @@ export class ProductsService {
         { barcode: { contains: q } },
         { description: { contains: q, mode: 'insensitive' } },
       ];
+    }
+
+    // Filtre par statut de stock
+    if (stockStatus === 'critical') {
+      where.AND = [{ stock: 0 }];
+    } else if (stockStatus === 'low') {
+      where.AND = [{ stock: { gt: 0 } }, { minStock: { gt: 0 } }];
+      // stock > 0 et stock <= minStock
+      where.AND = [{ stock: { gt: 0 } }, { minStock: { gt: 0 } }];
+    } else if (stockStatus === 'ok') {
+      where.AND = [{ stock: { gt: 0 } }];
     }
 
     const [products, total] = await Promise.all([
