@@ -636,3 +636,4140 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ========================================
+  // LICENCE DE DÉMO + CONFIG CLIENT
+  // ========================================
+  await prisma.clientConfig.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.license.deleteMany();
+
+  const demoExpiresAt = new Date();
+  demoExpiresAt.setMonth(demoExpiresAt.getMonth() + 1);
+
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe — 1 mois',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 1,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Limbe, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 12,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Limbe',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité à Limbe',
+          primaryColor: '#2563eb',
+          address: 'Limbe, Cameroun',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop Limbe',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop · Limbe, Cameroun · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Limbe',
+            code: 'STORE001',
+            address: 'Limbe, Cameroun',
+            phone: '+237 6 99 88 77 66',
+            city: 'Limbe',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+  const demoLicense = await prisma.license.create({
+    data: {
+      licenseKey: 'KABRAK-STD-2024-EASYSHOP-DEMO01',
+      clientName: 'Easy Shop',
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Carrefour Obili, Yaoundé, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 12,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Yaoundé',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité',
+          primaryColor: '#2563eb',
+          address: 'Carrefour Obili, Yaoundé',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop SARL · RCCM: CM/YDE/2024/B/123 · N° Contribuable: M0987654321 · Carrefour Obili, Yaoundé · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Bonamoussadi',
+            code: 'STORE001',
+            address: 'Carrefour Obili, Yaoundé',
+            phone: '+237 6 99 88 77 66',
+            city: 'Yaoundé',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+      clientEmail: 'contact@easyshop.cm',
+      clientPhone: '+237 6 99 88 77 66',
+      clientAddress: 'Carrefour Obili, Yaoundé, Cameroun',
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 12,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Yaoundé',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité',
+          primaryColor: '#2563eb',
+          address: 'Carrefour Obili, Yaoundé',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop SARL · RCCM: CM/YDE/2024/B/123 · N° Contribuable: M0987654321 · Carrefour Obili, Yaoundé · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Bonamoussadi',
+            code: 'STORE001',
+            address: 'Carrefour Obili, Yaoundé',
+            phone: '+237 6 99 88 77 66',
+            city: 'Yaoundé',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+      type: 'STANDARD',
+      maxStores: 1,
+      durationMonths: 12,
+      issuedAt: new Date(),
+      expiresAt: demoExpiresAt,
+      status: 'ACTIVE',
+      internalNotes: 'Licence de démonstration — Easy Shop Yaoundé',
+      config: {
+        create: {
+          supermarketName: 'Easy Shop',
+          supermarketSlogan: 'Votre supermarché de proximité',
+          primaryColor: '#2563eb',
+          address: 'Carrefour Obili, Yaoundé',
+          phone: '+237 6 99 88 77 66',
+          email: 'contact@easyshop.cm',
+          website: 'www.easyshop.cm',
+          receiptHeader: 'Bienvenue chez Easy Shop!',
+          receiptFooter: 'Merci de votre visite! À bientôt chez Easy Shop',
+          receiptShowLogo: true,
+          invoiceFooter: 'Easy Shop SARL · RCCM: CM/YDE/2024/B/123 · N° Contribuable: M0987654321 · Carrefour Obili, Yaoundé · Tél: +237 6 99 88 77 66',
+          currency: 'FCFA',
+          taxRate: 15.5,
+          enableLoyalty: true,
+          enableAutoPrint: false,
+        },
+      },
+      stores: {
+        create: [
+          {
+            name: 'Easy Shop Bonamoussadi',
+            code: 'STORE001',
+            address: 'Carrefour Obili, Yaoundé',
+            phone: '+237 6 99 88 77 66',
+            city: 'Yaoundé',
+            isActive: true,
+          },
+        ],
+      },
+    },
+    include: { config: true, stores: true },
+  });
+
+  console.log(`✅ Licence de démo créée:`);
+  console.log(`   Clé: ${demoLicense.licenseKey}`);
+  console.log(`   Client: ${demoLicense.clientName}`);
+  console.log(`   Type: ${demoLicense.type}`);
+  console.log(`   Expire le: ${demoLicense.expiresAt.toISOString().split('T')[0]}`);
+  console.log(`   Magasins: ${demoLicense.stores.length}`);
+
+  console.log('\n🎉 Seed terminé avec succès!');
+  console.log('\n📋 Comptes de test:');
+  console.log('   Manager: EMP001 / PIN: 1234');
+  console.log('   Caissier: EMP002 / PIN: 2345');
+  console.log('   Caissière: EMP003 / PIN: 3456');
+  console.log('   Magasinier: EMP004 / PIN: 4567');
+  console.log('   Superviseur: EMP005 / PIN: 5678');
+  console.log('\n🔑 Licence de démo:');
+  console.log('   KABRAK-STD-2024-EASYSHOP-DEMO01');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

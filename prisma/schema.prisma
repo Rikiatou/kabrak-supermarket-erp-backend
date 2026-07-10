@@ -128,9 +128,10 @@ model Transaction {
   total         Int
   
   // Paiement
-  paymentMethod String   // "cash", "card", "mobile", "mixed"
+  paymentMethod String   // "cash", "card", "mobile", "orange", "split"
   cashGiven     Int?     // Si cash
   change        Int?     // Si cash
+  splitBreakdown String? // JSON: {cash, card, mobile, orange} si paymentMethod="split"
   
   // Client (optionnel - fidélité)
   customerId    String?

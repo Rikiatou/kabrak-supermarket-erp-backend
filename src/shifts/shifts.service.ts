@@ -114,6 +114,7 @@ export class ShiftsService {
         cashGiven: true,
         change: true,
         cashierId: true,
+        splitBreakdown: true,
       },
       orderBy: { date: 'asc' },
     });
@@ -155,37 +156,48 @@ export class ShiftsService {
     const averageSale = customerCount > 0 ? Math.round(netSales / customerCount) : 0;
 
     // Receipts by method of payment (montant des ventes, pas cashGiven)
-    const cashReceipts = transactions
-      .filter((t) => t.paymentMethod === 'cash')
-      .reduce((s, t) => s + t.total, 0);
-    const cardReceipts = transactions
-      .filter((t) => t.paymentMethod === 'card')
-      .reduce((s, t) => s + t.total, 0);
-    const mobileReceipts = transactions
-      .filter((t) => t.paymentMethod === 'mobile')
-      .reduce((s, t) => s + t.total, 0);
-    const orangeReceipts = transactions
-      .filter((t) => t.paymentMethod === 'orange')
-      .reduce((s, t) => s + t.total, 0);
-    const splitTransactions = transactions.filter(
-      (t) => t.paymentMethod === 'split' || t.paymentMethod === 'mixed',
-    );
-    const splitReceipts = splitTransactions.reduce((s, t) => s + t.total, 0);
+    // Pour les splits, décomposer le breakdown en cash/card/mobile/orange
+    let cashReceipts = 0, cardReceipts = 0, mobileReceipts = 0, orangeReceipts = 0, splitReceipts = 0;
+    let splitCash = 0, splitCard = 0, splitMobile = 0, splitOrange = 0;
+    for (const t of transactions) {
+      if (t.paymentMethod === 'cash') {
+        cashReceipts += t.total;
+      } else if (t.paymentMethod === 'card') {
+        cardReceipts += t.total;
+      } else if (t.paymentMethod === 'mobile') {
+        mobileReceipts += t.total;
+      } else if (t.paymentMethod === 'orange') {
+        orangeReceipts += t.total;
+      } else if (t.paymentMethod === 'split' || t.paymentMethod === 'mixed') {
+        splitReceipts += t.total;
+        // Décomposer le split si breakdown disponible
+        if (t.splitBreakdown) {
+          try {
+            const bd = JSON.parse(t.splitBreakdown);
+            if (bd.cash) { splitCash += bd.cash; cashReceipts += bd.cash; }
+            if (bd.card) { splitCard += bd.card; cardReceipts += bd.card; }
+            if (bd.mobile) { splitMobile += bd.mobile; mobileReceipts += bd.mobile; }
+            if (bd.orange) { splitOrange += bd.orange; orangeReceipts += bd.orange; }
+          } catch {}
+        }
+      }
+    }
 
     // Cash physically received (cashGiven) and change given (monnaie rendue)
     const cashReceived = transactions
       .filter((t) => t.paymentMethod === 'cash')
-      .reduce((s, t) => s + (t.cashGiven || t.total), 0);
+      .reduce((s, t) => s + (t.cashGiven || t.total), 0)
+      + splitCash; // inclure le cash des splits
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
 
-    // Total receipts = somme des ventes par méthode
-    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts + splitReceipts;
+    // Total receipts = somme des ventes par méthode (split déjà décomposé)
+    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts;
 
     // Cash drawer = opening cash + cash physically received - change given
     const cashDrawerTotal = shift.openingCash + cashReceived - changeGiven;
 
-    // Total expected = opening cash + all sales - change given
-    const totalExpected = shift.openingCash + cashReceipts + cardReceipts + mobileReceipts + splitReceipts - changeGiven;
+    // Total expected = opening cash + all sales (non-cash) - change given
+    const totalExpected = shift.openingCash + cardReceipts + mobileReceipts + orangeReceipts + cashReceived - changeGiven;
 
     // Returns & credits — from refunded transactions
     const refundedTx = await this.prisma.transaction.aggregate({
@@ -318,6 +330,7 @@ export class ShiftsService {
         cashGiven: true,
         change: true,
         registerId: true,
+        splitBreakdown: true,
       },
       orderBy: { date: 'asc' },
     });
@@ -330,28 +343,38 @@ export class ShiftsService {
     const customerCount = transactions.length;
     const averageSale = customerCount > 0 ? Math.round(netSales / customerCount) : 0;
 
-    // Receipts by method
-    const cashReceipts = transactions
-      .filter((t) => t.paymentMethod === 'cash')
-      .reduce((s, t) => s + t.total, 0);
-    const cardReceipts = transactions
-      .filter((t) => t.paymentMethod === 'card')
-      .reduce((s, t) => s + t.total, 0);
-    const mobileReceipts = transactions
-      .filter((t) => t.paymentMethod === 'mobile')
-      .reduce((s, t) => s + t.total, 0);
-    const orangeReceipts = transactions
-      .filter((t) => t.paymentMethod === 'orange')
-      .reduce((s, t) => s + t.total, 0);
-    const splitReceipts = transactions
-      .filter((t) => t.paymentMethod === 'split' || t.paymentMethod === 'mixed')
-      .reduce((s, t) => s + t.total, 0);
+    // Receipts by method — décomposer les splits
+    let cashReceipts = 0, cardReceipts = 0, mobileReceipts = 0, orangeReceipts = 0, splitReceipts = 0;
+    let splitCash = 0;
+    for (const t of transactions) {
+      if (t.paymentMethod === 'cash') {
+        cashReceipts += t.total;
+      } else if (t.paymentMethod === 'card') {
+        cardReceipts += t.total;
+      } else if (t.paymentMethod === 'mobile') {
+        mobileReceipts += t.total;
+      } else if (t.paymentMethod === 'orange') {
+        orangeReceipts += t.total;
+      } else if (t.paymentMethod === 'split' || t.paymentMethod === 'mixed') {
+        splitReceipts += t.total;
+        if (t.splitBreakdown) {
+          try {
+            const bd = JSON.parse(t.splitBreakdown);
+            if (bd.cash) { splitCash += bd.cash; cashReceipts += bd.cash; }
+            if (bd.card) { cardReceipts += bd.card; }
+            if (bd.mobile) { mobileReceipts += bd.mobile; }
+            if (bd.orange) { orangeReceipts += bd.orange; }
+          } catch {}
+        }
+      }
+    }
 
     const cashReceived = transactions
       .filter((t) => t.paymentMethod === 'cash')
-      .reduce((s, t) => s + (t.cashGiven || t.total), 0);
+      .reduce((s, t) => s + (t.cashGiven || t.total), 0)
+      + splitCash;
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
-    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts + splitReceipts;
+    const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts;
 
     // Returns — from refunded transactions
     const refundedTx = await this.prisma.transaction.aggregate({

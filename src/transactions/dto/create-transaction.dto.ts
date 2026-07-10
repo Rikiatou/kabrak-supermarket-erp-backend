@@ -53,7 +53,7 @@ export class CreateTransactionDto {
   total: number;
 
   @IsString()
-  paymentMethod: string; // "cash", "card", "mobile", "mixed"
+  paymentMethod: string; // "cash", "card", "mobile", "orange", "split"
 
   @IsInt()
   @Min(0)
@@ -63,6 +63,10 @@ export class CreateTransactionDto {
   @IsInt()
   @IsOptional()
   change?: number;
+
+  @IsString()
+  @IsOptional()
+  splitBreakdown?: string; // JSON: {cash, card, mobile, orange}
 
   @IsString()
   @IsOptional()

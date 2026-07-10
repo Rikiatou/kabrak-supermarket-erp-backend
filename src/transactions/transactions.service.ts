@@ -36,6 +36,7 @@ export class TransactionsService {
           paymentMethod: createTransactionDto.paymentMethod,
           cashGiven: createTransactionDto.cashGiven,
           change: createTransactionDto.change,
+          splitBreakdown: createTransactionDto.splitBreakdown || null,
           customerId: createTransactionDto.customerId,
           status: 'completed',
           syncStatus: 'pending', // À synchroniser avec le cloud
