@@ -142,6 +142,7 @@ export class ShiftsService {
           cashGiven: true,
           change: true,
           cashierId: true,
+          splitBreakdown: true,
         },
         orderBy: { date: 'asc' },
       });
