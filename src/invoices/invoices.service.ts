@@ -55,9 +55,10 @@ export class InvoicesService {
     }));
 
     const subtotal = items.reduce((s, i) => s + i.total, 0);
+    const discount = dto.discount || 0;
     const taxRate = 0;
     const tax = 0;
-    const total = subtotal;
+    const total = subtotal - discount;
 
     // 1. Create the invoice
     const invoice = await this.prisma.invoice.create({
@@ -70,6 +71,7 @@ export class InvoicesService {
         customerId: dto.customerId || null,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         subtotal,
+        discount,
         taxRate,
         tax,
         total,

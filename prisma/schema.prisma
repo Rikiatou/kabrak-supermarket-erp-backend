@@ -494,6 +494,7 @@ model Invoice {
   dueDate     DateTime?
   
   subtotal    Int
+  discount    Int      @default(0)
   taxRate     Float    @default(15.5)
   tax         Int
   total       Int

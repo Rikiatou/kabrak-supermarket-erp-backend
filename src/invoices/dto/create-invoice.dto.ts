@@ -45,6 +45,10 @@ export class CreateInvoiceDto {
   items: InvoiceItemDto[];
 
   @IsOptional()
+  @IsNumber()
+  discount?: number;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 }
