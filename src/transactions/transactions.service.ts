@@ -115,12 +115,30 @@ export class TransactionsService {
   }
 
   // Liste paginée
-  async findAll(page: number = 1, limit: number = 50, cashierId?: string) {
+  async findAll(
+    page: number = 1,
+    limit: number = 50,
+    cashierId?: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
     if (cashierId) {
       where.cashierId = cashierId;
+    }
+
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) {
+        where.date.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.date.lte = end;
+      }
     }
 
     const [transactions, total] = await Promise.all([

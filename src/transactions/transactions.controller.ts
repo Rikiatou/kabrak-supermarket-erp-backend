@@ -23,11 +23,15 @@ export class TransactionsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('cashierId') cashierId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.transactionsService.findAll(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
       cashierId,
+      startDate,
+      endDate,
     );
   }
 

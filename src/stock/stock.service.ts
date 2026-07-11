@@ -30,12 +30,26 @@ export class StockService {
   }
 
   // Liste des mouvements
-  async findAllMovements(page: number = 1, limit: number = 50, productId?: string) {
+  async findAllMovements(
+    page: number = 1,
+    limit: number = 50,
+    productId?: string,
+    type?: string,
+    negativeOnly?: boolean,
+  ) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
     if (productId) {
       where.productId = productId;
+    }
+
+    if (type) {
+      where.type = type;
+    }
+
+    if (negativeOnly) {
+      where.quantity = { lt: 0 };
     }
 
     const [movements, total] = await Promise.all([

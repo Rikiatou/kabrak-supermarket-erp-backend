@@ -16,11 +16,15 @@ export class StockController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('productId') productId?: string,
+    @Query('type') type?: string,
+    @Query('negativeOnly') negativeOnly?: string,
   ) {
     return this.stockService.findAllMovements(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
       productId,
+      type,
+      negativeOnly === 'true',
     );
   }
 
