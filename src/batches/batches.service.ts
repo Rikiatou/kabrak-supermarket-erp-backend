@@ -51,12 +51,8 @@ export class BatchesService {
       },
     });
 
-    // Mettre à jour le stock total du produit
-    await this.prisma.product.update({
-      where: { id: data.productId },
-      data: { stock: { increment: data.quantity } },
-    });
-
+    // NOTE: Ne PAS incrémenter le stock ici — le stock est déjà incrémenté
+    // par purchaseOrders.service.createDirect() lors de la réception du delivery
     // Mettre à jour la date d'expiration du produit = date du lot le plus proche
     await this.updateProductExpiry(data.productId);
 

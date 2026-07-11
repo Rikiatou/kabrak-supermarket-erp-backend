@@ -95,7 +95,6 @@ export class ShiftsService {
     const endTime = shift.closedAt || new Date();
 
     // Toutes les transactions de cette caisse pendant le shift
-    // D'abord par registerId, sinon par cashierId (fallback pour anciennes transactions)
     let transactions: any[] = await this.prisma.transaction.findMany({
       where: {
         registerId: shift.registerId,
