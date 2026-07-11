@@ -110,6 +110,7 @@ export class ShiftsService {
             quantity: true,
             unitPrice: true,
             total: true,
+            product: { select: { name: true } },
           },
         },
       },
@@ -300,12 +301,13 @@ export class ShiftsService {
 
   // Agréger les produits vendus depuis les transactions
   private aggregateSoldProducts(transactions: any[]) {
-    const productMap = new Map<string, { productId: string; quantity: number; total: number }>();
+    const productMap = new Map<string, { productId: string; productName: string; quantity: number; total: number }>();
 
     for (const tx of transactions) {
       if (!tx.items) continue;
       for (const item of tx.items) {
         const key = item.productId;
+        const name = item.product?.name || 'Produit supprimé';
         const existing = productMap.get(key);
         if (existing) {
           existing.quantity += item.quantity;
@@ -313,6 +315,7 @@ export class ShiftsService {
         } else {
           productMap.set(key, {
             productId: key,
+            productName: name,
             quantity: item.quantity,
             total: item.total,
           });
@@ -356,6 +359,7 @@ export class ShiftsService {
             quantity: true,
             unitPrice: true,
             total: true,
+            product: { select: { name: true } },
           },
         },
       },
