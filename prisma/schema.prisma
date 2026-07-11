@@ -232,11 +232,16 @@ model Shift {
   notes         String?
   employeeName  String?
   registerName  String?
-  
+
+  // Sync
+  syncStatus    String   @default("pending")
+  syncedAt      DateTime?
+
   @@index([registerId])
   @@index([employeeId])
   @@index([openedAt])
   @@index([status])
+  @@index([syncStatus])
 
   @@map("shifts")
 }
