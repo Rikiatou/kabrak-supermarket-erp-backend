@@ -78,55 +78,50 @@ export class SyncService implements OnModuleInit {
       invoices: 0,
       returns: 0,
       customers: 0,
+      expenses: 0,
+      revenues: 0,
+      suppliers: 0,
+      purchaseOrders: 0,
+      schedules: 0,
+      loyaltyHistory: 0,
+      stores: 0,
+      productBatches: 0,
       errors: [] as string[],
     };
 
-    try {
-      // 1. Sync transactions
-      results.transactions = await this.syncTransactions();
-    } catch (e) {
-      results.errors.push(`Transactions: ${e.message}`);
+    const syncItems: Array<{ name: string; fn: () => Promise<number> }> = [
+      { name: 'Transactions', fn: () => this.syncTransactions() },
+      { name: 'Stock', fn: () => this.syncStockMovements() },
+      { name: 'Shifts', fn: () => this.syncShifts() },
+      { name: 'Invoices', fn: () => this.syncInvoices() },
+      { name: 'Returns', fn: () => this.syncReturns() },
+      { name: 'Customers', fn: () => this.syncCustomers() },
+      { name: 'Expenses', fn: () => this.syncExpenses() },
+      { name: 'Revenues', fn: () => this.syncRevenues() },
+      { name: 'Suppliers', fn: () => this.syncSuppliers() },
+      { name: 'PurchaseOrders', fn: () => this.syncPurchaseOrders() },
+      { name: 'Schedules', fn: () => this.syncSchedules() },
+      { name: 'LoyaltyHistory', fn: () => this.syncLoyaltyHistory() },
+      { name: 'Stores', fn: () => this.syncStores() },
+      { name: 'ProductBatches', fn: () => this.syncProductBatches() },
+    ];
+
+    for (const item of syncItems) {
+      try {
+        const count = await item.fn();
+        (results as any)[item.name.toLowerCase()] = count;
+      } catch (e: any) {
+        results.errors.push(`${item.name}: ${e.message}`);
+      }
     }
 
-    try {
-      // 2. Sync stock movements
-      results.stockMovements = await this.syncStockMovements();
-    } catch (e) {
-      results.errors.push(`Stock: ${e.message}`);
-    }
-
-    try {
-      // 3. Sync shifts
-      results.shifts = await this.syncShifts();
-    } catch (e) {
-      results.errors.push(`Shifts: ${e.message}`);
-    }
-
-    try {
-      // 4. Sync invoices
-      results.invoices = await this.syncInvoices();
-    } catch (e) {
-      results.errors.push(`Invoices: ${e.message}`);
-    }
-
-    try {
-      // 5. Sync returns
-      results.returns = await this.syncReturns();
-    } catch (e) {
-      results.errors.push(`Returns: ${e.message}`);
-    }
-
-    try {
-      // 6. Sync customers
-      results.customers = await this.syncCustomers();
-    } catch (e) {
-      results.errors.push(`Customers: ${e.message}`);
-    }
-
-    const total = results.transactions + results.stockMovements + results.shifts + results.invoices + results.returns + results.customers;
+    const total = (results.transactions + results.stockMovements + results.shifts + results.invoices +
+      results.returns + results.customers + results.expenses + results.revenues +
+      results.suppliers + results.purchaseOrders + results.schedules +
+      results.loyaltyHistory + results.stores + results.productBatches);
     if (total > 0) {
       console.log(
-        `✅ Sync: ${results.transactions} tx, ${results.stockMovements} stock, ${results.shifts} shifts, ${results.invoices} factures, ${results.returns} retours, ${results.customers} clients`,
+        `✅ Sync: ${results.transactions} tx, ${results.stockMovements} stock, ${results.shifts} shifts, ${results.invoices} factures, ${results.returns} retours, ${results.customers} clients, ${results.expenses} dépenses, ${results.revenues} recettes, ${results.suppliers} fournisseurs, ${results.purchaseOrders} achats, ${results.schedules} plannings`,
       );
     }
 
@@ -272,10 +267,11 @@ export class SyncService implements OnModuleInit {
     return synced;
   }
 
-  // Sync invoices vers cloud
+  // Sync invoices vers cloud (avec items + payments)
   private async syncInvoices(): Promise<number> {
     const pending = await this.prisma.invoice.findMany({
       where: { syncStatus: 'pending' },
+      include: { items: true, payments: true },
       take: 50,
     }).catch(() => []);
 
@@ -307,10 +303,11 @@ export class SyncService implements OnModuleInit {
     return synced;
   }
 
-  // Sync returns vers cloud
+  // Sync returns vers cloud (avec items)
   private async syncReturns(): Promise<number> {
     const pending = await this.prisma.productReturn.findMany({
       where: { syncStatus: 'pending' },
+      include: { items: true },
       take: 50,
     }).catch(() => []);
 
@@ -377,19 +374,268 @@ export class SyncService implements OnModuleInit {
     return synced;
   }
 
+  // Sync expenses vers cloud
+  private async syncExpenses(): Promise<number> {
+    const pending = await this.prisma.expense.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const exp of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/accounting/expenses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(exp),
+        });
+        if (response.ok) {
+          await this.prisma.expense.update({
+            where: { id: exp.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync revenues vers cloud
+  private async syncRevenues(): Promise<number> {
+    const pending = await this.prisma.revenue.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const rev of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/accounting/revenues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(rev),
+        });
+        if (response.ok) {
+          await this.prisma.revenue.update({
+            where: { id: rev.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync suppliers vers cloud
+  private async syncSuppliers(): Promise<number> {
+    const pending = await this.prisma.supplier.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const sup of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/suppliers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(sup),
+        });
+        if (response.ok) {
+          await this.prisma.supplier.update({
+            where: { id: sup.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync purchase orders vers cloud (avec items)
+  private async syncPurchaseOrders(): Promise<number> {
+    const pending = await this.prisma.purchaseOrder.findMany({
+      where: { syncStatus: 'pending' },
+      include: { items: true },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const po of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/purchase-orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(po),
+        });
+        if (response.ok) {
+          await this.prisma.purchaseOrder.update({
+            where: { id: po.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync schedules vers cloud
+  private async syncSchedules(): Promise<number> {
+    const pending = await this.prisma.schedule.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const sch of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/schedules`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(sch),
+        });
+        if (response.ok) {
+          await this.prisma.schedule.update({
+            where: { id: sch.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync loyalty history vers cloud
+  private async syncLoyaltyHistory(): Promise<number> {
+    const pending = await this.prisma.loyaltyHistory.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const lh of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/customers/${lh.customerId}/loyalty`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(lh),
+        });
+        if (response.ok) {
+          await this.prisma.loyaltyHistory.update({
+            where: { id: lh.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync stores vers cloud
+  private async syncStores(): Promise<number> {
+    const pending = await this.prisma.store.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const store of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/licenses/${store.licenseId}/stores`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(store),
+        });
+        if (response.ok) {
+          await this.prisma.store.update({
+            where: { id: store.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
+  // Sync product batches vers cloud
+  private async syncProductBatches(): Promise<number> {
+    const pending = await this.prisma.productBatch.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const batch of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/batches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
+          body: JSON.stringify(batch),
+        });
+        if (response.ok) {
+          await this.prisma.productBatch.update({
+            where: { id: batch.id },
+            data: { syncStatus: 'synced', syncedAt: new Date() },
+          }).catch(() => {});
+          synced++;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return synced;
+  }
+
   // Statut sync
   async getStatus() {
-    const [pendingTx, pendingMovements, pendingShifts, pendingInvoices, pendingReturns, pendingCustomers, failedLogs] = await Promise.all([
+    const [
+      pendingTx, pendingMovements, pendingShifts, pendingInvoices,
+      pendingReturns, pendingCustomers, pendingExpenses, pendingRevenues,
+      pendingSuppliers, pendingPurchaseOrders, pendingSchedules,
+      pendingLoyalty, pendingStores, pendingBatches, failedLogs
+    ] = await Promise.all([
       this.prisma.transaction.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.stockMovement.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.shift.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.invoice.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.productReturn.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.customer.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.expense.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.revenue.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.supplier.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.purchaseOrder.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.schedule.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.loyaltyHistory.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.store.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.productBatch.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.syncLog.count({ where: { status: 'failed' } }).catch(() => 0),
     ]);
 
-    const total = pendingTx + pendingMovements + pendingShifts + pendingInvoices + pendingReturns + pendingCustomers;
+    const total = pendingTx + pendingMovements + pendingShifts + pendingInvoices +
+      pendingReturns + pendingCustomers + pendingExpenses + pendingRevenues +
+      pendingSuppliers + pendingPurchaseOrders + pendingSchedules +
+      pendingLoyalty + pendingStores + pendingBatches;
 
     return {
       enabled: this.syncEnabled,
@@ -402,6 +648,14 @@ export class SyncService implements OnModuleInit {
         invoices: pendingInvoices,
         returns: pendingReturns,
         customers: pendingCustomers,
+        expenses: pendingExpenses,
+        revenues: pendingRevenues,
+        suppliers: pendingSuppliers,
+        purchaseOrders: pendingPurchaseOrders,
+        schedules: pendingSchedules,
+        loyaltyHistory: pendingLoyalty,
+        stores: pendingStores,
+        productBatches: pendingBatches,
         total,
       },
       failed: failedLogs,

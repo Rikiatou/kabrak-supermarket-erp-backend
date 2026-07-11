@@ -94,6 +94,8 @@ model Supplier {
   rating        Float    @default(0)
   isActive      Boolean  @default(true)
   licenseKey    String?
+  syncStatus    String   @default("pending")
+  syncedAt      DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -330,6 +332,8 @@ model PurchaseOrder {
   
   total        Int
   status       String   @default("draft") // "draft", "sent", "received", "cancelled"
+  syncStatus   String   @default("pending")
+  syncedAt     DateTime?
   
   notes        String?
   
@@ -413,11 +417,14 @@ model LoyaltyHistory {
   points      Int      // Positif = gagné, Négatif = dépensé
   reason      String   // "purchase", "reward_redeemed", "bonus"
   reference   String?  // ID transaction
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
   
   createdAt   DateTime @default(now())
   
   @@index([customerId])
   @@index([createdAt])
+  @@index([syncStatus])
   
   @@map("loyalty_history")
 }
@@ -460,10 +467,13 @@ model Expense {
   paymentMethod String @default("cash")
   supplier    String?
   status      String   @default("paid") // "paid", "pending"
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
   createdAt   DateTime @default(now())
   
   @@index([date])
   @@index([category])
+  @@index([syncStatus])
   @@map("expenses")
 }
 
@@ -476,10 +486,13 @@ model Revenue {
   category    String   // "sales", "services", "other"
   description String
   amount      Int
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
   createdAt   DateTime @default(now())
   
   @@index([date])
   @@index([category])
+  @@index([syncStatus])
   @@map("revenues")
 }
 
@@ -608,6 +621,8 @@ model Schedule {
   breakEnd    String?  // "13:00"
   
   isActive    Boolean  @default(true)
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
   
   notes       String?  // "Remplacement", "Heures supplémentaires", etc.
   
@@ -618,6 +633,7 @@ model Schedule {
   @@index([employeeId])
   @@index([registerId])
   @@index([dayOfWeek])
+  @@index([syncStatus])
   
   @@map("schedules")
 }
@@ -751,6 +767,8 @@ model Store {
   phone       String?
   city        String?
   isActive    Boolean  @default(true)
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -758,6 +776,7 @@ model Store {
   @@index([licenseId])
   @@index([code])
   @@index([isActive])
+  @@index([syncStatus])
 
   @@map("stores")
 }
@@ -776,6 +795,8 @@ model ProductBatch {
   expiryDate  DateTime?
   receivedDate DateTime @default(now())
   licenseKey  String?
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -783,6 +804,7 @@ model ProductBatch {
   @@index([productId])
   @@index([expiryDate])
   @@index([licenseKey])
+  @@index([syncStatus])
 
   @@map("product_batches")
 }
