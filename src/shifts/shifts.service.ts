@@ -96,25 +96,22 @@ export class ShiftsService {
 
     // Toutes les transactions de cette caisse pendant le shift
     // D'abord par registerId, sinon par cashierId (fallback pour anciennes transactions)
-    let transactions = await this.prisma.transaction.findMany({
+    let transactions: any[] = await this.prisma.transaction.findMany({
       where: {
         registerId: shift.registerId,
         date: { gte: startTime, lte: endTime },
         status: 'completed',
       },
-      select: {
-        id: true,
-        transactionNumber: true,
-        date: true,
-        subtotal: true,
-        discount: true,
-        tax: true,
-        total: true,
-        paymentMethod: true,
-        cashGiven: true,
-        change: true,
-        cashierId: true,
-        splitBreakdown: true,
+      include: {
+        items: {
+          select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            unitPrice: true,
+            total: true,
+          },
+        },
       },
       orderBy: { date: 'asc' },
     });
@@ -130,19 +127,16 @@ export class ShiftsService {
           date: { gte: startTime, lte: endTime },
           status: 'completed',
         },
-        select: {
-          id: true,
-          transactionNumber: true,
-          date: true,
-          subtotal: true,
-          discount: true,
-          tax: true,
-          total: true,
-          paymentMethod: true,
-          cashGiven: true,
-          change: true,
-          cashierId: true,
-          splitBreakdown: true,
+        include: {
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+              unitPrice: true,
+              total: true,
+            },
+          },
         },
         orderBy: { date: 'asc' },
       });
@@ -260,22 +254,28 @@ export class ShiftsService {
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
 
-      // Invoice payments collected during this shift
+      // Invoice payments collected during this shift (SEPARATE from POS sales)
       invoicePayments: {
         cash: invoiceCash,
         card: invoiceCard,
         mobile: invoiceMobile,
         total: invoiceTotal,
+        note: 'Paiements de factures collectés pendant le shift (séparés des ventes POS)',
       },
 
+      // Receipts = POS sales + invoice payments (clearly separated)
       receiptsByMethod: {
         cash: cashReceipts + invoiceCash,
         card: cardReceipts + invoiceCard,
         mobile: mobileReceipts + invoiceMobile,
         orange: orangeReceipts,
         split: splitReceipts,
+        posSalesOnly: { cash: cashReceipts, card: cardReceipts, mobile: mobileReceipts, orange: orangeReceipts, split: splitReceipts, total: totalReceipts },
+        invoicePaymentsOnly: { cash: invoiceCash, card: invoiceCard, mobile: invoiceMobile, total: invoiceTotal },
       },
       totalReceipts: totalReceipts + invoiceTotal,
+      posSalesTotal: totalReceipts,
+      invoicePaymentsTotal: invoiceTotal,
       changeGiven,
       cashReceived,
       cashDrawerTotal: cashDrawerTotal + invoiceCash,
@@ -284,14 +284,46 @@ export class ShiftsService {
       customerCount,
       averageSale,
 
+      // Détail des transactions avec les produits vendus
       transactions: transactions.map((t) => ({
         id: t.id,
         transactionNumber: t.transactionNumber,
         date: t.date,
+        subtotal: t.subtotal,
+        discount: t.discount,
         total: t.total,
         paymentMethod: t.paymentMethod,
+        items: t.items || [],
       })),
+
+      // Détail des produits vendus (agrégé)
+      soldProducts: this.aggregateSoldProducts(transactions),
     };
+  }
+
+  // Agréger les produits vendus depuis les transactions
+  private aggregateSoldProducts(transactions: any[]) {
+    const productMap = new Map<string, { productId: string; quantity: number; total: number }>();
+
+    for (const tx of transactions) {
+      if (!tx.items) continue;
+      for (const item of tx.items) {
+        const key = item.productId;
+        const existing = productMap.get(key);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.total += item.total;
+        } else {
+          productMap.set(key, {
+            productId: key,
+            quantity: item.quantity,
+            total: item.total,
+          });
+        }
+      }
+    }
+
+    return Array.from(productMap.values()).sort((a, b) => b.total - a.total);
   }
 
   // Z-Report journalier par caissier (sans dépendre des shifts)
@@ -313,25 +345,22 @@ export class ShiftsService {
     const dayEnd = new Date(`${dateStr}T23:59:59.999`);
 
     // Toutes les transactions complétées de ce caissier ce jour
-    const transactions = await this.prisma.transaction.findMany({
+    const transactions: any[] = await this.prisma.transaction.findMany({
       where: {
         cashierId: employeeId,
         date: { gte: dayStart, lte: dayEnd },
         status: 'completed',
       },
-      select: {
-        id: true,
-        transactionNumber: true,
-        date: true,
-        subtotal: true,
-        discount: true,
-        tax: true,
-        total: true,
-        paymentMethod: true,
-        cashGiven: true,
-        change: true,
-        registerId: true,
-        splitBreakdown: true,
+      include: {
+        items: {
+          select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            unitPrice: true,
+            total: true,
+          },
+        },
       },
       orderBy: { date: 'asc' },
     });
@@ -456,22 +485,28 @@ export class ShiftsService {
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
 
-      // Invoice payments collected during this day
+      // Invoice payments collected during this day (SEPARATE from POS sales)
       invoicePayments: {
         cash: invoiceCash,
         card: invoiceCard,
         mobile: invoiceMobile,
         total: invoiceTotal,
+        note: 'Paiements de factures collectés ce jour (séparés des ventes POS)',
       },
 
+      // Receipts = POS sales + invoice payments (clearly separated)
       receiptsByMethod: {
         cash: cashReceipts + invoiceCash,
         card: cardReceipts + invoiceCard,
         mobile: mobileReceipts + invoiceMobile,
         orange: orangeReceipts,
         split: splitReceipts,
+        posSalesOnly: { cash: cashReceipts, card: cardReceipts, mobile: mobileReceipts, orange: orangeReceipts, split: splitReceipts, total: totalReceipts },
+        invoicePaymentsOnly: { cash: invoiceCash, card: invoiceCard, mobile: invoiceMobile, total: invoiceTotal },
       },
       totalReceipts: totalReceipts + invoiceTotal,
+      posSalesTotal: totalReceipts,
+      invoicePaymentsTotal: invoiceTotal,
       changeGiven,
       cashReceived,
       cashDrawerTotal,
@@ -480,13 +515,20 @@ export class ShiftsService {
       customerCount,
       averageSale,
 
+      // Détail des transactions avec les produits vendus
       transactions: transactions.map((t) => ({
         id: t.id,
         transactionNumber: t.transactionNumber,
         date: t.date,
+        subtotal: t.subtotal,
+        discount: t.discount,
         total: t.total,
         paymentMethod: t.paymentMethod,
+        items: t.items || [],
       })),
+
+      // Détail des produits vendus (agrégé)
+      soldProducts: this.aggregateSoldProducts(transactions),
     };
   }
 }
