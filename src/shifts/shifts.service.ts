@@ -263,13 +263,14 @@ export class ShiftsService {
         total: invoiceTotal,
       },
 
-      // Receipts = POS sales + invoice payments (all together)
+      // Receipts = POS sales by method + invoice as separate line
       receiptsByMethod: {
-        cash: cashReceipts + invoiceCash,
-        card: cardReceipts + invoiceCard,
-        mobile: mobileReceipts + invoiceMobile,
+        cash: cashReceipts,           // POS cash only (sans factures)
+        card: cardReceipts,           // POS card only
+        mobile: mobileReceipts,       // POS mobile only
         orange: orangeReceipts,
         split: splitReceipts,
+        invoice: invoiceTotal,        // Factures séparées
       },
       totalReceipts: totalReceipts + invoiceTotal,
       changeGiven,
@@ -490,13 +491,14 @@ export class ShiftsService {
         total: invoiceTotal,
       },
 
-      // Receipts = POS sales + invoice payments (all together)
+      // Receipts = POS sales by method + invoice as separate line
       receiptsByMethod: {
-        cash: cashReceipts + invoiceCash,
-        card: cardReceipts + invoiceCard,
-        mobile: mobileReceipts + invoiceMobile,
+        cash: cashReceipts,           // POS cash only (sans factures)
+        card: cardReceipts,           // POS card only
+        mobile: mobileReceipts,       // POS mobile only
         orange: orangeReceipts,
         split: splitReceipts,
+        invoice: invoiceTotal,        // Factures séparées
       },
       totalReceipts: totalReceipts + invoiceTotal,
       changeGiven,
