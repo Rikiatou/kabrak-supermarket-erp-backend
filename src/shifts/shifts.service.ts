@@ -230,8 +230,9 @@ export class ShiftsService {
     const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
     const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
-    // Net sales after subtracting returns
-    const adjustedNetSales = netSales - returnsAndCredits;
+    // Net sales = POS sales + invoice payments - returns
+    // (invoice payments INCLUDED in net sales so Net Sales = Total Receipts)
+    const adjustedNetSales = netSales + invoiceTotal - returnsAndCredits;
 
     return {
       shiftId: shift.id,
@@ -247,35 +248,30 @@ export class ShiftsService {
       difference: shift.difference,
       notes: shift.notes,
 
-      grossSales,
+      grossSales: grossSales + invoiceTotal,
       returnsAndCredits,
       totalDiscount,
       totalTax,
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
 
-      // Invoice payments collected during this shift (SEPARATE from POS sales)
+      // Invoice payments collected during this shift
       invoicePayments: {
         cash: invoiceCash,
         card: invoiceCard,
         mobile: invoiceMobile,
         total: invoiceTotal,
-        note: 'Paiements de factures collectés pendant le shift (séparés des ventes POS)',
       },
 
-      // Receipts = POS sales + invoice payments (clearly separated)
+      // Receipts = POS sales + invoice payments (all together)
       receiptsByMethod: {
         cash: cashReceipts + invoiceCash,
         card: cardReceipts + invoiceCard,
         mobile: mobileReceipts + invoiceMobile,
         orange: orangeReceipts,
         split: splitReceipts,
-        posSalesOnly: { cash: cashReceipts, card: cardReceipts, mobile: mobileReceipts, orange: orangeReceipts, split: splitReceipts, total: totalReceipts },
-        invoicePaymentsOnly: { cash: invoiceCash, card: invoiceCard, mobile: invoiceMobile, total: invoiceTotal },
       },
       totalReceipts: totalReceipts + invoiceTotal,
-      posSalesTotal: totalReceipts,
-      invoicePaymentsTotal: invoiceTotal,
       changeGiven,
       cashReceived,
       cashDrawerTotal: cashDrawerTotal + invoiceCash,
@@ -442,8 +438,9 @@ export class ShiftsService {
     const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
     const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
-    // Net sales after subtracting returns
-    const adjustedNetSales = netSales - returnsAndCredits;
+    // Net sales = POS sales + invoice payments - returns
+    // (invoice payments INCLUDED in net sales so Net Sales = Total Receipts)
+    const adjustedNetSales = netSales + invoiceTotal - returnsAndCredits;
 
     // Chercher les shifts de ce caissier ce jour (pour info)
     const shifts = await this.prisma.shift.findMany({
@@ -478,35 +475,30 @@ export class ShiftsService {
       difference: closingCash - cashDrawerTotal,
       notes: `Z-Report journalier — ${dateStr}`,
 
-      grossSales,
+      grossSales: grossSales + invoiceTotal,
       returnsAndCredits,
       totalDiscount,
       totalTax,
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
 
-      // Invoice payments collected during this day (SEPARATE from POS sales)
+      // Invoice payments collected during this day
       invoicePayments: {
         cash: invoiceCash,
         card: invoiceCard,
         mobile: invoiceMobile,
         total: invoiceTotal,
-        note: 'Paiements de factures collectés ce jour (séparés des ventes POS)',
       },
 
-      // Receipts = POS sales + invoice payments (clearly separated)
+      // Receipts = POS sales + invoice payments (all together)
       receiptsByMethod: {
         cash: cashReceipts + invoiceCash,
         card: cardReceipts + invoiceCard,
         mobile: mobileReceipts + invoiceMobile,
         orange: orangeReceipts,
         split: splitReceipts,
-        posSalesOnly: { cash: cashReceipts, card: cardReceipts, mobile: mobileReceipts, orange: orangeReceipts, split: splitReceipts, total: totalReceipts },
-        invoicePaymentsOnly: { cash: invoiceCash, card: invoiceCard, mobile: invoiceMobile, total: invoiceTotal },
       },
       totalReceipts: totalReceipts + invoiceTotal,
-      posSalesTotal: totalReceipts,
-      invoicePaymentsTotal: invoiceTotal,
       changeGiven,
       cashReceived,
       cashDrawerTotal,
