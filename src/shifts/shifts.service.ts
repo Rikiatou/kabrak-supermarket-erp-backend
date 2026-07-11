@@ -230,9 +230,10 @@ export class ShiftsService {
     const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
     const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
-    // Net sales = POS sales + invoice payments - returns
-    // (invoice payments INCLUDED in net sales so Net Sales = Total Receipts)
-    const adjustedNetSales = netSales + invoiceTotal - returnsAndCredits;
+    // Net sales = POS sales (incluant les transactions INV-PAY-) - returns
+    // Les paiements de factures sont déjà dans les transactions (préfixe INV-PAY-)
+    // donc ils sont déjà comptés dans cashReceipts et netSales
+    const adjustedNetSales = netSales - returnsAndCredits;
 
     return {
       shiftId: shift.id,
@@ -248,14 +249,14 @@ export class ShiftsService {
       difference: shift.difference,
       notes: shift.notes,
 
-      grossSales: grossSales + invoiceTotal,
+      grossSales: grossSales,
       returnsAndCredits,
       totalDiscount,
       totalTax,
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
 
-      // Invoice payments collected during this shift
+      // Invoice payments collected during this shift (informational)
       invoicePayments: {
         cash: invoiceCash,
         card: invoiceCard,
@@ -263,19 +264,19 @@ export class ShiftsService {
         total: invoiceTotal,
       },
 
-      // Receipts = POS sales by method + invoice as separate line
+      // Receipts = tout le cash reçu (POS + factures) dans cash
+      // Pas de ligne facture séparée pour éviter la confusion
       receiptsByMethod: {
-        cash: cashReceipts,           // POS cash only (sans factures)
-        card: cardReceipts,           // POS card only
-        mobile: mobileReceipts,       // POS mobile only
+        cash: cashReceipts,           // POS cash + invoice cash (via transactions INV-PAY-)
+        card: cardReceipts,           // POS card + invoice card
+        mobile: mobileReceipts,       // POS mobile + invoice mobile
         orange: orangeReceipts,
         split: splitReceipts,
-        invoice: invoiceTotal,        // Factures séparées
       },
-      totalReceipts: totalReceipts + invoiceTotal,
+      totalReceipts: totalReceipts,   // Pas + invoiceTotal (déjà dans cashReceipts)
       changeGiven,
       cashReceived,
-      cashDrawerTotal: cashDrawerTotal + invoiceCash,
+      cashDrawerTotal: cashDrawerTotal,
       totalExpected: totalExpected + invoiceCash,
 
       customerCount,
@@ -442,9 +443,9 @@ export class ShiftsService {
     const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
     const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
-    // Net sales = POS sales + invoice payments - returns
-    // (invoice payments INCLUDED in net sales so Net Sales = Total Receipts)
-    const adjustedNetSales = netSales + invoiceTotal - returnsAndCredits;
+    // Net sales = POS sales (incluant INV-PAY-) - returns
+    // Les paiements de factures sont déjà dans les transactions (préfixe INV-PAY-)
+    const adjustedNetSales = netSales - returnsAndCredits;
 
     // Chercher les shifts de ce caissier ce jour (pour info)
     const shifts = await this.prisma.shift.findMany({
@@ -460,7 +461,7 @@ export class ShiftsService {
 
     const openingCash = shifts.reduce((s, sh) => s + (sh.openingCash || 0), 0);
     const closingCash = shifts.reduce((s, sh) => s + (sh.closingCash || 0), 0);
-    const cashDrawerTotal = openingCash + cashReceived - changeGiven + invoiceCash;
+    const cashDrawerTotal = openingCash + cashReceived - changeGiven;
 
     const registerId = shifts[0]?.registerId || transactions[0]?.registerId || 'N/A';
     const registerName = shifts[0]?.registerName || registerId;
@@ -479,14 +480,14 @@ export class ShiftsService {
       difference: closingCash - cashDrawerTotal,
       notes: `Z-Report journalier — ${dateStr}`,
 
-      grossSales: grossSales + invoiceTotal,
+      grossSales: grossSales,
       returnsAndCredits,
       totalDiscount,
       totalTax,
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
 
-      // Invoice payments collected during this day
+      // Invoice payments collected during this day (informational)
       invoicePayments: {
         cash: invoiceCash,
         card: invoiceCard,
@@ -494,20 +495,21 @@ export class ShiftsService {
         total: invoiceTotal,
       },
 
-      // Receipts = POS sales by method + invoice as separate line
+      // Receipts = POS sales by method (incluant INV-PAY- dans cash)
+      // invoice = ligne informative (sous-ensemble, pas à ajouter au total)
       receiptsByMethod: {
-        cash: cashReceipts,           // POS cash only (sans factures)
-        card: cardReceipts,           // POS card only
-        mobile: mobileReceipts,       // POS mobile only
+        cash: cashReceipts,           // POS cash + invoice cash (via INV-PAY-)
+        card: cardReceipts,           // POS card + invoice card
+        mobile: mobileReceipts,       // POS mobile + invoice mobile
         orange: orangeReceipts,
         split: splitReceipts,
-        invoice: invoiceTotal,        // Factures séparées
+        invoice: invoiceTotal,        // Informatif : montant des paiements de factures
       },
-      totalReceipts: totalReceipts + invoiceTotal,
+      totalReceipts: totalReceipts,   // Pas + invoiceTotal (déjà dans cashReceipts)
       changeGiven,
       cashReceived,
       cashDrawerTotal,
-      totalExpected: totalReceipts + invoiceTotal + openingCash - changeGiven,
+      totalExpected: totalReceipts + openingCash - changeGiven,
 
       customerCount,
       averageSale,

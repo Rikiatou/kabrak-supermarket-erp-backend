@@ -8,7 +8,11 @@ export class InvoicesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(page: number = 1, limit: number = 50, status?: string) {
-    const where = status ? { status } : {};
+    const where = status
+      ? status.includes(',')
+        ? { status: { in: status.split(',') } }
+        : { status }
+      : {};
     const [invoices, total] = await Promise.all([
       this.prisma.invoice.findMany({
         where,
@@ -148,9 +152,45 @@ export class InvoicesService {
       },
     });
 
-    // NOTE: On ne crée PLUS de Transaction pour les paiements de factures
-    // Les invoicePayments sont déjà comptés séparément dans le Z-report
-    // Créer une Transaction causait un DOUBLE COMPTAGE (une fois dans POS, une fois dans factures)
+    // Créer une Transaction avec préfixe INV-PAY- pour que le paiement apparaisse
+    // dans les ventes du caissier (My Sales). Le Z-report exclut ces transactions
+    // du POS total pour éviter le double comptage (elles sont dans la ligne Factures).
+    if (cashierId) {
+      try {
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const txCount = await this.prisma.transaction.count({
+          where: {
+            date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+          },
+        });
+        const transactionNumber = `INV-PAY-${dateStr}-${String(txCount + 1).padStart(4, '0')}`;
+
+        const activeShift = await this.prisma.shift.findFirst({
+          where: { employeeId: cashierId, status: 'open' },
+          orderBy: { openedAt: 'desc' },
+        });
+
+        await this.prisma.transaction.create({
+          data: {
+            transactionNumber,
+            cashierId,
+            registerId: activeShift?.registerId || null,
+            subtotal: dto.amount,
+            discount: 0,
+            tax: 0,
+            total: dto.amount,
+            paymentMethod: dto.method,
+            cashGiven: dto.method === 'cash' ? dto.amount : null,
+            change: 0,
+            status: 'completed',
+            syncStatus: 'pending',
+          },
+        });
+      } catch (e) {
+        console.error('Failed to create transaction for invoice payment:', e);
+      }
+    }
 
     // Recalculer paidAmount et balance
     const newPaidAmount = currentPaid + dto.amount;
