@@ -44,12 +44,28 @@ export class ProductsService {
       delete data.expiryDate;
     }
 
-    return this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data,
       include: {
         supplier: true,
       },
     });
+
+    // Create initial stock movement if stock > 0
+    if (product.stock > 0) {
+      await this.prisma.stockMovement.create({
+        data: {
+          productId: product.id,
+          type: 'in',
+          quantity: product.stock,
+          reason: 'initial',
+          reference: 'INITIAL STOCK',
+          notes: 'Initial stock on product creation',
+        },
+      });
+    }
+
+    return product;
   }
 
   // Liste paginée
