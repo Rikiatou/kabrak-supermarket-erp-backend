@@ -59,6 +59,7 @@ export class StockService {
         take: limit,
         include: {
           product: true,
+          employee: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
