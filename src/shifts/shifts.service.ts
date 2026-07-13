@@ -277,7 +277,7 @@ export class ShiftsService {
       changeGiven,
       cashReceived,
       cashDrawerTotal: cashDrawerTotal,
-      totalExpected: totalExpected + invoiceCash,
+      totalExpected: totalExpected,  // invoiceCash déjà inclus via transactions INV-PAY-
 
       customerCount,
       averageSale,

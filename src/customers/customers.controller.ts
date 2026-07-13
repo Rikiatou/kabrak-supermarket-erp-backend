@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Req } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 
@@ -30,8 +30,8 @@ export class CustomersController {
   }
 
   @Post()
-  create(@Body() dto: CreateCustomerDto) {
-    return this.customersService.create(dto);
+  create(@Body() dto: CreateCustomerDto, @Req() req: any) {
+    return this.customersService.create(dto, req.user?.id);
   }
 
   @Patch(':id')

@@ -81,6 +81,7 @@ export class InvoicesService {
         total,
         balance: total,
         notes: dto.notes || null,
+        createdBy: createdBy || null,
         items: { create: items },
       },
       include: { items: true, payments: true },
@@ -236,12 +237,13 @@ export class InvoicesService {
     return { ...invoice, payments };
   }
 
-  async updateStatus(id: string, status: string, paymentMethod?: string) {
+  async updateStatus(id: string, status: string, paymentMethod?: string, modifiedBy?: string) {
     const data: any = { status };
     if (status === 'paid') {
       data.paidAt = new Date();
       if (paymentMethod) data.paymentMethod = paymentMethod;
     }
+    if (modifiedBy) data.createdBy = modifiedBy;
     return this.prisma.invoice.update({
       where: { id },
       data,

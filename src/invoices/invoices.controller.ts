@@ -72,8 +72,9 @@ export class InvoicesController {
   updateStatus(
     @Param('id') id: string,
     @Body() body: { status: string; paymentMethod?: string },
+    @Req() req: any,
   ) {
-    return this.invoicesService.updateStatus(id, body.status, body.paymentMethod);
+    return this.invoicesService.updateStatus(id, body.status, body.paymentMethod, req.user?.id);
   }
 
   @Delete(':id')

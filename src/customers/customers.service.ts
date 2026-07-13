@@ -62,7 +62,7 @@ export class CustomersService {
     });
   }
 
-  async create(dto: CreateCustomerDto) {
+  async create(dto: CreateCustomerDto, createdBy?: string) {
     const count = await this.prisma.customer.count();
     const customerNumber = `KAB-${String(count + 1).padStart(6, '0')}`;
 
@@ -81,6 +81,7 @@ export class CustomersService {
         lastName: dto.lastName,
         phone: dto.phone,
         email: dto.email || null, // Convertir "" en null
+        createdBy: createdBy || null,
       },
     });
   }

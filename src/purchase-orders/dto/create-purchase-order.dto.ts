@@ -57,6 +57,10 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   invoiceNumber?: string;
 
+  @IsString()
+  @IsOptional()
+  createdBy?: string; // employeeId
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseOrderItemDto)

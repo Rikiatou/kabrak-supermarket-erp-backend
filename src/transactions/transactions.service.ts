@@ -197,7 +197,11 @@ export class TransactionsService {
     return this.prisma.transaction.findMany({
       where: { syncStatus: 'pending' },
       include: {
-        items: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
       orderBy: { date: 'asc' },
     });

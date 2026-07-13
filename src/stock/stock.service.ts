@@ -123,7 +123,10 @@ export class StockService {
   async findPendingSync() {
     return this.prisma.stockMovement.findMany({
       where: { syncStatus: 'pending' },
-      include: { product: true },
+      include: {
+        product: true,
+        employee: { select: { id: true, firstName: true, lastName: true, role: true } },
+      },
     });
   }
 

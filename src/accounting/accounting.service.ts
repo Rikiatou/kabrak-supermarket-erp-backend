@@ -34,6 +34,7 @@ export class AccountingService {
         paymentMethod: dto.paymentMethod || 'cash',
         supplier: dto.supplier,
         status: 'paid',
+        createdBy: dto.createdBy || null,
       },
     });
   }

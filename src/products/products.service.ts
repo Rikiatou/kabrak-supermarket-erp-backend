@@ -22,6 +22,13 @@ export class ProductsService {
         where: { OR: orConditions },
       });
       if (existing) {
+        // Si le produit existant a été supprimé (soft-delete), on le réactive
+        // avec les nouvelles données au lieu de bloquer la recréation.
+        // Sinon le code-barres unique reste "occupé" par un produit invisible
+        // dans la liste mais toujours visible au POS.
+        if (!existing.isActive) {
+          return this.reactivate(existing.id, createProductDto);
+        }
         throw new ConflictException(
           `Produit avec SKU "${createProductDto.sku}" ou barcode "${createProductDto.barcode}" existe déjà`,
         );
@@ -61,6 +68,41 @@ export class ProductsService {
           reason: 'initial',
           reference: 'INITIAL STOCK',
           notes: 'Initial stock on product creation',
+        },
+      });
+    }
+
+    return product;
+  }
+
+  // Réactiver un produit soft-supprimé lors d'une "recréation".
+  // On applique les nouvelles données fournies et on remet isActive=true.
+  private async reactivate(id: string, dto: CreateProductDto) {
+    const data: any = { ...dto, isActive: true };
+    if (dto.expiryDate) {
+      data.expiryDate = new Date(dto.expiryDate);
+    } else {
+      delete data.expiryDate;
+    }
+    // Ne pas écraser sku/barcode par des valeurs vides
+    if (!dto.sku) delete data.sku;
+    if (!dto.barcode) delete data.barcode;
+
+    const product = await this.prisma.product.update({
+      where: { id },
+      data,
+      include: { supplier: true },
+    });
+
+    if (product.stock > 0) {
+      await this.prisma.stockMovement.create({
+        data: {
+          productId: product.id,
+          type: 'in',
+          quantity: product.stock,
+          reason: 'initial',
+          reference: 'REACTIVATION',
+          notes: 'Stock défini lors de la réactivation du produit',
         },
       });
     }

@@ -22,4 +22,8 @@ export class CreateExpenseDto {
   @IsString()
   @IsOptional()
   supplier?: string;
+
+  @IsString()
+  @IsOptional()
+  createdBy?: string; // employeeId
 }

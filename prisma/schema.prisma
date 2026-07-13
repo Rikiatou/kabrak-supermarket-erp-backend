@@ -338,10 +338,11 @@ model PurchaseOrder {
   syncedAt     DateTime?
   
   notes        String?
-  
+  createdBy    String?  // employeeId who created the order
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
+
   items        PurchaseOrderItem[]
   
   @@index([supplierId])
@@ -390,7 +391,8 @@ model Customer {
   tier        String   @default("bronze") // "bronze", "silver", "gold", "platinum"
   
   isActive    Boolean  @default(true)
-  
+  createdBy   String?  // employeeId who created the customer
+
   // Sync
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
@@ -469,6 +471,7 @@ model Expense {
   paymentMethod String @default("cash")
   supplier    String?
   status      String   @default("paid") // "paid", "pending"
+  createdBy   String?  // employeeId who created the expense
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
   createdAt   DateTime @default(now())
@@ -533,11 +536,12 @@ model Invoice {
   paymentMethod String? // "cash", "card", "mobile", "transfer"
   
   notes       String?
-  
+  createdBy   String?  // employeeId who created the invoice
+
   // Sync
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  
+
   items       InvoiceItem[]
   payments    InvoicePayment[]
   
@@ -550,6 +554,7 @@ model Invoice {
   @@index([customerId])
   @@index([clientName])
   @@index([syncStatus])
+  @@index([createdBy])
   
   @@map("invoices")
 }

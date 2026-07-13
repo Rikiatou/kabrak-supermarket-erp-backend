@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, IsNumber, Min } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
 
 export class UpdateProductDto {
   @IsString()
@@ -82,4 +82,8 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   expiryDate?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

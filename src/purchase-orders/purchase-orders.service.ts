@@ -80,6 +80,7 @@ export class PurchaseOrdersService {
         notes: dto.notes,
         total,
         status: 'draft',
+        createdBy: dto.createdBy || createdBy || null,
         items: {
           create: dto.items.map((item) => ({
             productId: item.productId,
@@ -165,6 +166,7 @@ export class PurchaseOrdersService {
         total,
         status: 'received',
         receivedDate: new Date(),
+        createdBy: dto.createdBy || createdBy || null,
         items: {
           create: resolvedItems.map((item) => ({
             productId: item.productId,

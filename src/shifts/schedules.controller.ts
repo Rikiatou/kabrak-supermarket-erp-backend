@@ -27,6 +27,12 @@ export class SchedulesController {
     return this.schedulesService.getTodaySchedule();
   }
 
+  // Liste de toutes les caisses (pour le frontend)
+  @Get('registers')
+  getRegisters() {
+    return this.schedulesService.getRegisters();
+  }
+
   // Planning d'un employé
   @Get('employee/:employeeId')
   findByEmployee(@Param('employeeId') employeeId: string) {

@@ -106,6 +106,19 @@ export class SchedulesService {
     });
   }
 
+  // Liste de toutes les caisses (pour le frontend)
+  async getRegisters() {
+    return this.prisma.cashRegister.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+      },
+      orderBy: { code: 'asc' },
+    });
+  }
+
   // Qui est censé être à quelle caisse aujourd'hui ?
   async getTodaySchedule() {
     const today = new Date().getDay(); // 0=dimanche, 6=samedi
