@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { getCurrentTenantId } from '../tenant/tenant.context';
 
 @Injectable()
 export class TransactionsService {
@@ -22,6 +23,7 @@ export class TransactionsService {
     const transactionNumber = `TXN-${dateStr}-${String(count + 1).padStart(4, '0')}`;
 
     // Transaction dans une transaction DB (atomicité)
+    const tenantId = getCurrentTenantId();
     const transaction = await this.prisma.$transaction(async (prisma) => {
       // 1. Créer la transaction
       const tx = await prisma.transaction.create({
@@ -38,6 +40,7 @@ export class TransactionsService {
           change: createTransactionDto.change,
           splitBreakdown: createTransactionDto.splitBreakdown || null,
           customerId: createTransactionDto.customerId,
+          tenantId: tenantId || null,
           status: 'completed',
           syncStatus: 'pending', // À synchroniser avec le cloud
           items: {
@@ -83,6 +86,7 @@ export class TransactionsService {
             reason: 'sale',
             reference: tx.transactionNumber,
             notes: item.discount > 0 ? `Remise article: ${item.discount}` : undefined,
+            tenantId: tenantId || null,
             syncStatus: 'pending',
           },
         });
