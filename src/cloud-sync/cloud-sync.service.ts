@@ -18,7 +18,7 @@ export class CloudSyncService {
     } = data;
 
     return this.prisma.product.upsert({
-      where: { id },
+      where: { sku },
       create: {
         id, sku, barcode, name, description, category, subCategory, brand,
         price, costPrice, taxRate, wholesalePrice, packQuantity, packBarcode,
@@ -31,7 +31,7 @@ export class CloudSyncService {
         syncStatus: 'synced', syncedAt: new Date(),
       },
       update: {
-        sku, barcode, name, description, category, subCategory, brand,
+        barcode, name, description, category, subCategory, brand,
         price, costPrice, taxRate, wholesalePrice, packQuantity, packBarcode,
         markdownPrice, markdownReason, markdownNote, markdownStartsAt, markdownExpiresAt,
         stock, minStock, maxStock, unit, expiryDate: expiryDate ? new Date(expiryDate) : null,
@@ -50,8 +50,10 @@ export class CloudSyncService {
       createdAt, updatedAt,
     } = data;
 
+    // Use employeeNumber as the unique business key to prevent duplicates
+    // when the local DB regenerates Prisma IDs
     return this.prisma.employee.upsert({
-      where: { id },
+      where: { employeeNumber },
       create: {
         id, employeeNumber, firstName, lastName, role, department,
         phone, email, hireDate: new Date(hireDate), status, pin, licenseKey,
@@ -61,8 +63,9 @@ export class CloudSyncService {
         syncStatus: 'synced', syncedAt: new Date(),
       },
       update: {
-        employeeNumber, firstName, lastName, role, department,
+        firstName, lastName, role, department,
         phone, email, hireDate: new Date(hireDate), status, pin, licenseKey,
+        tenantId: tenantId || null,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
       },
@@ -76,7 +79,7 @@ export class CloudSyncService {
     } = data;
 
     return this.prisma.cashRegister.upsert({
-      where: { id },
+      where: { code },
       create: {
         id, name, code, status, openingCash, currentCash,
         location, isActive,
@@ -86,7 +89,7 @@ export class CloudSyncService {
         syncStatus: 'synced', syncedAt: new Date(),
       },
       update: {
-        name, code, status, openingCash, currentCash,
+        name, status, openingCash, currentCash,
         location, isActive,
         tenantId: tenantId || null,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
@@ -171,15 +174,17 @@ export class CloudSyncService {
   }
 
   async upsertCustomer(data: any) {
+    const { id, customerNumber, ...rest } = data;
     return this.prisma.customer.upsert({
-      where: { id: data.id },
+      where: { customerNumber },
       create: {
-        ...data,
+        ...rest,
+        id, customerNumber,
         createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
       },
       update: {
-        ...data,
+        ...rest,
         syncStatus: 'synced', syncedAt: new Date(),
       },
     });
