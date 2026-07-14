@@ -78,7 +78,7 @@ export class ProductsService {
   // Réactiver un produit soft-supprimé lors d'une "recréation".
   // On applique les nouvelles données fournies et on remet isActive=true.
   private async reactivate(id: string, dto: CreateProductDto) {
-    const data: any = { ...dto, isActive: true };
+    const data: any = { ...dto, isActive: true, syncStatus: 'pending' };
     if (dto.expiryDate) {
       data.expiryDate = new Date(dto.expiryDate);
     } else {
@@ -289,6 +289,9 @@ export class ProductsService {
       delete data.expiryDate;
     }
 
+    // Marquer pour re-sync cloud
+    data.syncStatus = 'pending';
+
     return this.prisma.product.update({
       where: { id },
       data,
@@ -302,7 +305,7 @@ export class ProductsService {
 
     return this.prisma.product.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: false, syncStatus: 'pending' },
     });
   }
 
@@ -387,6 +390,7 @@ export class ProductsService {
         markdownNote: dto.markdownNote || null,
         markdownStartsAt: new Date(),
         markdownExpiresAt: dto.markdownExpiresAt ? new Date(dto.markdownExpiresAt) : null,
+        syncStatus: 'pending',
       },
       include: { supplier: true },
     });
@@ -404,6 +408,7 @@ export class ProductsService {
         markdownNote: null,
         markdownStartsAt: null,
         markdownExpiresAt: null,
+        syncStatus: 'pending',
       },
       include: { supplier: true },
     });
@@ -482,6 +487,7 @@ export class ProductsService {
         markdownNote: null,
         markdownStartsAt: null,
         markdownExpiresAt: null,
+        syncStatus: 'pending',
       },
     });
 

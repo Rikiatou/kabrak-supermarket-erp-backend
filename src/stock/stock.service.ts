@@ -23,6 +23,7 @@ export class StockService {
         stock: {
           increment: dto.quantity,
         },
+        syncStatus: 'pending',
       },
     });
 
@@ -167,7 +168,7 @@ export class StockService {
 
     await this.prisma.product.update({
       where: { id: productId },
-      data: { stock: newStock },
+      data: { stock: newStock, syncStatus: 'pending' },
     });
 
     return movement;

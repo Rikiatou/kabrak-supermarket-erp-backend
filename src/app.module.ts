@@ -25,6 +25,7 @@ import { CronModule } from './cron/cron.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { ReturnsModule } from './returns/returns.module';
 import { BatchesModule } from './batches/batches.module';
+import { CloudSyncModule } from './cloud-sync/cloud-sync.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { BatchesModule } from './batches/batches.module';
     StockModule,
     ImportModule,
     SyncModule,
+    CloudSyncModule,
     SuppliersModule,
     EmployeesModule,
     PurchaseOrdersModule,

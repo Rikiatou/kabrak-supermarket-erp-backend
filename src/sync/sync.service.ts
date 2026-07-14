@@ -69,9 +69,54 @@ export class SyncService implements OnModuleInit {
     }
   }
 
+  // Helper générique: POST vers /cloud-sync/<endpoint> et marque synced
+  private async syncEntity(
+    endpoint: string,
+    pending: any[],
+    entityType: string,
+    markSynced: (id: string) => Promise<any>,
+  ): Promise<number> {
+    if (pending.length === 0) return 0;
+
+    let synced = 0;
+    for (const item of pending) {
+      try {
+        const response = await fetch(`${this.cloudApiUrl}/cloud-sync/${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.cloudApiKey,
+          },
+          body: JSON.stringify(item),
+        });
+
+        if (response.ok) {
+          await markSynced(item.id);
+          synced++;
+        }
+      } catch (e: any) {
+        await this.prisma.syncLog.create({
+          data: {
+            entityType,
+            entityId: item.id,
+            action: 'upsert',
+            status: 'failed',
+            error: e.message,
+            attempts: 1,
+            lastAttempt: new Date(),
+          },
+        }).catch(() => {});
+      }
+    }
+    return synced;
+  }
+
   // Synchroniser tout
   async syncAll() {
     const results = {
+      products: 0,
+      employees: 0,
+      cashRegisters: 0,
       transactions: 0,
       stockMovements: 0,
       shifts: 0,
@@ -90,6 +135,9 @@ export class SyncService implements OnModuleInit {
     };
 
     const syncItems: Array<{ name: string; fn: () => Promise<number> }> = [
+      { name: 'Products', fn: () => this.syncProducts() },
+      { name: 'Employees', fn: () => this.syncEmployees() },
+      { name: 'CashRegisters', fn: () => this.syncCashRegisters() },
       { name: 'Transactions', fn: () => this.syncTransactions() },
       { name: 'Stock', fn: () => this.syncStockMovements() },
       { name: 'Shifts', fn: () => this.syncShifts() },
@@ -115,13 +163,14 @@ export class SyncService implements OnModuleInit {
       }
     }
 
-    const total = (results.transactions + results.stockMovements + results.shifts + results.invoices +
+    const total = (results.products + results.employees + results.cashRegisters +
+      results.transactions + results.stockMovements + results.shifts + results.invoices +
       results.returns + results.customers + results.expenses + results.revenues +
       results.suppliers + results.purchaseOrders + results.schedules +
       results.loyaltyHistory + results.stores + results.productBatches);
     if (total > 0) {
       console.log(
-        `✅ Sync: ${results.transactions} tx, ${results.stockMovements} stock, ${results.shifts} shifts, ${results.invoices} factures, ${results.returns} retours, ${results.customers} clients, ${results.expenses} dépenses, ${results.revenues} recettes, ${results.suppliers} fournisseurs, ${results.purchaseOrders} achats, ${results.schedules} plannings`,
+        `✅ Sync: ${results.products} produits, ${results.employees} employés, ${results.cashRegisters} caisses, ${results.transactions} tx, ${results.stockMovements} stock, ${results.shifts} shifts, ${results.invoices} factures, ${results.returns} retours, ${results.customers} clients, ${results.expenses} dépenses, ${results.revenues} recettes, ${results.suppliers} fournisseurs, ${results.purchaseOrders} achats, ${results.schedules} plannings`,
       );
     }
 
@@ -132,55 +181,65 @@ export class SyncService implements OnModuleInit {
     return results;
   }
 
+  // Sync produits vers cloud
+  private async syncProducts(): Promise<number> {
+    const pending = await this.prisma.product.findMany({
+      where: { syncStatus: 'pending' },
+      take: 200,
+    }).catch(() => []);
+
+    return this.syncEntity('products', pending, 'product', (id) =>
+      this.prisma.product.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
+  }
+
+  // Sync employés vers cloud
+  private async syncEmployees(): Promise<number> {
+    const pending = await this.prisma.employee.findMany({
+      where: { syncStatus: 'pending' },
+      take: 100,
+    }).catch(() => []);
+
+    return this.syncEntity('employees', pending, 'employee', (id) =>
+      this.prisma.employee.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
+  }
+
+  // Sync caisses vers cloud
+  private async syncCashRegisters(): Promise<number> {
+    const pending = await this.prisma.cashRegister.findMany({
+      where: { syncStatus: 'pending' },
+      take: 50,
+    }).catch(() => []);
+
+    return this.syncEntity('cash-registers', pending, 'cash_register', (id) =>
+      this.prisma.cashRegister.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
+  }
+
   // Sync transactions vers cloud
   private async syncTransactions(): Promise<number> {
     const pending = await this.prisma.transaction.findMany({
       where: { syncStatus: 'pending' },
       include: { items: true },
-      take: 100, // Batch de 100
+      take: 100,
     });
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const tx of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/transactions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(tx),
-        });
-
-        if (response.ok) {
-          await this.prisma.transaction.update({
-            where: { id: tx.id },
-            data: {
-              syncStatus: 'synced',
-              syncedAt: new Date(),
-            },
-          });
-          synced++;
-        }
-      } catch (e) {
-        // Log erreur mais continuer
-        await this.prisma.syncLog.create({
-          data: {
-            entityType: 'transaction',
-            entityId: tx.id,
-            action: 'create',
-            status: 'failed',
-            error: e.message,
-            attempts: 1,
-            lastAttempt: new Date(),
-          },
-        });
-      }
-    }
-
-    return synced;
+    return this.syncEntity('transactions', pending, 'transaction', (id) =>
+      this.prisma.transaction.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
   // Sync mouvements de stock vers cloud
@@ -190,46 +249,12 @@ export class SyncService implements OnModuleInit {
       take: 100,
     });
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const movement of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/stock/movements`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(movement),
-        });
-
-        if (response.ok) {
-          await this.prisma.stockMovement.update({
-            where: { id: movement.id },
-            data: {
-              syncStatus: 'synced',
-              syncedAt: new Date(),
-            },
-          });
-          synced++;
-        }
-      } catch (e) {
-        await this.prisma.syncLog.create({
-          data: {
-            entityType: 'stock_movement',
-            entityId: movement.id,
-            action: 'create',
-            status: 'failed',
-            error: e.message,
-            attempts: 1,
-            lastAttempt: new Date(),
-          },
-        });
-      }
-    }
-
-    return synced;
+    return this.syncEntity('stock-movements', pending, 'stock_movement', (id) =>
+      this.prisma.stockMovement.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
   // Sync shifts vers cloud
@@ -239,35 +264,15 @@ export class SyncService implements OnModuleInit {
       take: 50,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const shift of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/shifts`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(shift),
-        });
-
-        if (response.ok) {
-          await this.prisma.shift.update({
-            where: { id: shift.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    return synced;
+    return this.syncEntity('shifts', pending, 'shift', (id) =>
+      this.prisma.shift.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync invoices vers cloud (avec items + payments)
+  // Sync factures vers cloud
   private async syncInvoices(): Promise<number> {
     const pending = await this.prisma.invoice.findMany({
       where: { syncStatus: 'pending' },
@@ -275,35 +280,15 @@ export class SyncService implements OnModuleInit {
       take: 50,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const inv of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/invoices`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(inv),
-        });
-
-        if (response.ok) {
-          await this.prisma.invoice.update({
-            where: { id: inv.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    return synced;
+    return this.syncEntity('invoices', pending, 'invoice', (id) =>
+      this.prisma.invoice.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync returns vers cloud (avec items)
+  // Sync retours vers cloud
   private async syncReturns(): Promise<number> {
     const pending = await this.prisma.productReturn.findMany({
       where: { syncStatus: 'pending' },
@@ -311,157 +296,75 @@ export class SyncService implements OnModuleInit {
       take: 50,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const ret of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/returns`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(ret),
-        });
-
-        if (response.ok) {
-          await this.prisma.productReturn.update({
-            where: { id: ret.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    return synced;
+    return this.syncEntity('returns', pending, 'return', (id) =>
+      this.prisma.productReturn.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync customers vers cloud
+  // Sync clients vers cloud
   private async syncCustomers(): Promise<number> {
     const pending = await this.prisma.customer.findMany({
       where: { syncStatus: 'pending' },
-      take: 50,
+      take: 100,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const cust of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/customers`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(cust),
-        });
-
-        if (response.ok) {
-          await this.prisma.customer.update({
-            where: { id: cust.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    return synced;
+    return this.syncEntity('customers', pending, 'customer', (id) =>
+      this.prisma.customer.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync expenses vers cloud
+  // Sync dépenses vers cloud
   private async syncExpenses(): Promise<number> {
     const pending = await this.prisma.expense.findMany({
       where: { syncStatus: 'pending' },
-      take: 50,
+      take: 100,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const exp of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/accounting/expenses`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(exp),
-        });
-        if (response.ok) {
-          await this.prisma.expense.update({
-            where: { id: exp.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('expenses', pending, 'expense', (id) =>
+      this.prisma.expense.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync revenues vers cloud
+  // Sync recettes vers cloud
   private async syncRevenues(): Promise<number> {
     const pending = await this.prisma.revenue.findMany({
       where: { syncStatus: 'pending' },
-      take: 50,
+      take: 100,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const rev of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/accounting/revenues`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(rev),
-        });
-        if (response.ok) {
-          await this.prisma.revenue.update({
-            where: { id: rev.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('revenues', pending, 'revenue', (id) =>
+      this.prisma.revenue.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync suppliers vers cloud
+  // Sync fournisseurs vers cloud
   private async syncSuppliers(): Promise<number> {
     const pending = await this.prisma.supplier.findMany({
       where: { syncStatus: 'pending' },
-      take: 50,
+      take: 100,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const sup of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/suppliers`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(sup),
-        });
-        if (response.ok) {
-          await this.prisma.supplier.update({
-            where: { id: sup.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('suppliers', pending, 'supplier', (id) =>
+      this.prisma.supplier.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync purchase orders vers cloud (avec items)
+  // Sync commandes d'achat vers cloud
   private async syncPurchaseOrders(): Promise<number> {
     const pending = await this.prisma.purchaseOrder.findMany({
       where: { syncStatus: 'pending' },
@@ -469,84 +372,42 @@ export class SyncService implements OnModuleInit {
       take: 50,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const po of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/purchase-orders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(po),
-        });
-        if (response.ok) {
-          await this.prisma.purchaseOrder.update({
-            where: { id: po.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('purchase-orders', pending, 'purchase_order', (id) =>
+      this.prisma.purchaseOrder.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync schedules vers cloud
+  // Sync plannings vers cloud
   private async syncSchedules(): Promise<number> {
     const pending = await this.prisma.schedule.findMany({
       where: { syncStatus: 'pending' },
-      take: 50,
+      take: 100,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const sch of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/schedules`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(sch),
-        });
-        if (response.ok) {
-          await this.prisma.schedule.update({
-            where: { id: sch.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('schedules', pending, 'schedule', (id) =>
+      this.prisma.schedule.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync loyalty history vers cloud
+  // Sync historique fidélité vers cloud
   private async syncLoyaltyHistory(): Promise<number> {
     const pending = await this.prisma.loyaltyHistory.findMany({
       where: { syncStatus: 'pending' },
-      take: 50,
+      take: 100,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const lh of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/customers/${lh.customerId}/loyalty`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(lh),
-        });
-        if (response.ok) {
-          await this.prisma.loyaltyHistory.update({
-            where: { id: lh.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('loyalty-history', pending, 'loyalty_history', (id) =>
+      this.prisma.loyaltyHistory.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
   // Sync stores vers cloud
@@ -556,65 +417,41 @@ export class SyncService implements OnModuleInit {
       take: 50,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const store of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/licenses/${store.licenseId}/stores`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(store),
-        });
-        if (response.ok) {
-          await this.prisma.store.update({
-            where: { id: store.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('stores', pending, 'store', (id) =>
+      this.prisma.store.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
-  // Sync product batches vers cloud
+  // Sync lots de produits vers cloud
   private async syncProductBatches(): Promise<number> {
     const pending = await this.prisma.productBatch.findMany({
       where: { syncStatus: 'pending' },
       take: 50,
     }).catch(() => []);
 
-    if (pending.length === 0) return 0;
-
-    let synced = 0;
-    for (const batch of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/batches`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': this.cloudApiKey },
-          body: JSON.stringify(batch),
-        });
-        if (response.ok) {
-          await this.prisma.productBatch.update({
-            where: { id: batch.id },
-            data: { syncStatus: 'synced', syncedAt: new Date() },
-          }).catch(() => {});
-          synced++;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return synced;
+    return this.syncEntity('product-batches', pending, 'product_batch', (id) =>
+      this.prisma.productBatch.update({
+        where: { id },
+        data: { syncStatus: 'synced', syncedAt: new Date() },
+      }),
+    );
   }
 
   // Statut sync
   async getStatus() {
     const [
+      pendingProducts, pendingEmployees, pendingCashRegisters,
       pendingTx, pendingMovements, pendingShifts, pendingInvoices,
       pendingReturns, pendingCustomers, pendingExpenses, pendingRevenues,
       pendingSuppliers, pendingPurchaseOrders, pendingSchedules,
       pendingLoyalty, pendingStores, pendingBatches, failedLogs
     ] = await Promise.all([
+      this.prisma.product.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.employee.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.prisma.cashRegister.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.transaction.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.stockMovement.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
       this.prisma.shift.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
@@ -632,7 +469,8 @@ export class SyncService implements OnModuleInit {
       this.prisma.syncLog.count({ where: { status: 'failed' } }).catch(() => 0),
     ]);
 
-    const total = pendingTx + pendingMovements + pendingShifts + pendingInvoices +
+    const total = pendingProducts + pendingEmployees + pendingCashRegisters +
+      pendingTx + pendingMovements + pendingShifts + pendingInvoices +
       pendingReturns + pendingCustomers + pendingExpenses + pendingRevenues +
       pendingSuppliers + pendingPurchaseOrders + pendingSchedules +
       pendingLoyalty + pendingStores + pendingBatches;
@@ -642,6 +480,9 @@ export class SyncService implements OnModuleInit {
       online: this.isOnline,
       cloudApiUrl: this.cloudApiUrl || 'non configuré',
       pending: {
+        products: pendingProducts,
+        employees: pendingEmployees,
+        cashRegisters: pendingCashRegisters,
         transactions: pendingTx,
         stockMovements: pendingMovements,
         shifts: pendingShifts,

@@ -58,7 +58,11 @@ model Product {
   // Métadonnées
   imageUrl    String?
   isActive    Boolean  @default(true)
-  
+
+  // Sync cloud
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
+
   // Relations
   transactionItems TransactionItem[]
   stockMovements   StockMovement[]
@@ -198,7 +202,11 @@ model CashRegister {
   
   location    String?  // "Entrée principale", "Sortie"
   isActive    Boolean  @default(true)
-  
+
+  // Sync cloud
+  syncStatus  String   @default("pending")
+  syncedAt    DateTime?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -268,6 +276,10 @@ model Employee {
   // Auth (simple pour commencer)
   pin           String?  // PIN 4 chiffres pour login caisse
   licenseKey    String?
+
+  // Sync cloud
+  syncStatus    String   @default("pending")
+  syncedAt      DateTime?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

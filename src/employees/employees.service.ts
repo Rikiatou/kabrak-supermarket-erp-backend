@@ -64,14 +64,17 @@ export class EmployeesService {
   }
 
   async update(id: string, data: any) {
-    return this.prisma.employee.update({ where: { id }, data });
+    return this.prisma.employee.update({
+      where: { id },
+      data: { ...data, syncStatus: 'pending' },
+    });
   }
 
   async remove(id: string) {
     // Soft delete: marquer comme inactif au lieu de supprimer (préserver l'historique)
     return this.prisma.employee.update({
       where: { id },
-      data: { status: 'inactive' },
+      data: { status: 'inactive', syncStatus: 'pending' },
     });
   }
 

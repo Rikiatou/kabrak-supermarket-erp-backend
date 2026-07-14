@@ -70,6 +70,7 @@ export class TransactionsService {
             stock: {
               decrement: item.quantity,
             },
+            syncStatus: 'pending',
           },
         });
 
@@ -475,6 +476,7 @@ export class TransactionsService {
             stock: {
               increment: item.quantity,
             },
+            syncStatus: 'pending',
           },
         });
 
