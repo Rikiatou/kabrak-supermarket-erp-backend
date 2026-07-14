@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && prisma db push --accept-data-loss && tsc",
     "postinstall": "prisma generate",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "node dist/main",
