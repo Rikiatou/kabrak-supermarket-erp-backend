@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
 
   // Agrège toutes les notifications importantes
   async getNotifications() {
@@ -206,7 +210,7 @@ export class NotificationsService {
       _sum: { total: true },
     });
     const revenue = todayRevenue._sum.total || 0;
-    const DAILY_GOAL = 500000; // 500k FCFA
+    const DAILY_GOAL = parseInt(this.configService.get<string>('DAILY_REVENUE_GOAL', '500000'), 10);
     if (revenue >= DAILY_GOAL) {
       items.push({
         id: `revenue-goal-${todayStart.toISOString().split('T')[0]}`,
