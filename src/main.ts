@@ -20,6 +20,11 @@ async function bootstrap() {
     // Tous les sous-domaines de vercel.app (preview deployments)
     if (origin.endsWith('.vercel.app')) return callback(null, true);
 
+    // Tous les sous-domaines de kabrak-retail.com (app, tenants, etc.)
+    if (origin.endsWith('.kabrak-retail.com') || origin === 'https://kabrak-retail.com') {
+      return callback(null, true);
+    }
+
     // Localhost en dev
     if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
       return callback(null, true);
