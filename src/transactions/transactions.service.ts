@@ -10,17 +10,28 @@ export class TransactionsService {
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
   async create(createTransactionDto: CreateTransactionDto) {
-    // Générer numéro de transaction
+    // Générer numéro de transaction unique (avec retry)
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const count = await this.prisma.transaction.count({
       where: {
         date: {
-          gte: new Date(today.setHours(0, 0, 0, 0)),
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
       },
     });
-    const transactionNumber = `TXN-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+    let seq = count + 1;
+    let transactionNumber = `TXN-${dateStr}-${String(seq).padStart(4, '0')}`;
+
+    // Vérifier que le numéro n'existe pas déjà (retry jusqu'à 10 fois)
+    for (let i = 0; i < 10; i++) {
+      const exists = await this.prisma.transaction.findUnique({
+        where: { transactionNumber },
+      });
+      if (!exists) break;
+      seq++;
+      transactionNumber = `TXN-${dateStr}-${String(seq).padStart(4, '0')}`;
+    }
 
     // Transaction dans une transaction DB (atomicité)
     const tenantId = getCurrentTenantId();
