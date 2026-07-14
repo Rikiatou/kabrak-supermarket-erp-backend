@@ -129,40 +129,53 @@ export class SyncService implements OnModuleInit {
       // Apply products
       for (const prod of data.products || []) {
         try {
-          await this.prisma.product.upsert({
-            where: { sku: prod.sku },
-            create: {
-              id: prod.id, sku: prod.sku, barcode: prod.barcode,
-              name: prod.name, description: prod.description,
-              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
-              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
-              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
-              packBarcode: prod.packBarcode,
-              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
-              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
-              markdownExpiresAt: prod.markdownExpiresAt,
-              stock: prod.stock, minStock: prod.minStock, maxStock: prod.maxStock,
-              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
-              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
-              tenantId: prod.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-            update: {
-              name: prod.name, description: prod.description,
-              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
-              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
-              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
-              packBarcode: prod.packBarcode,
-              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
-              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
-              markdownExpiresAt: prod.markdownExpiresAt,
-              minStock: prod.minStock, maxStock: prod.maxStock,
-              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
-              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
-              tenantId: prod.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
+          // Try to find existing product by id, sku, or barcode
+          const existing = await this.prisma.product.findFirst({
+            where: { OR: [{ id: prod.id }, { sku: prod.sku }, ...(prod.barcode ? [{ barcode: prod.barcode }] : [])] },
+            select: { id: true },
           });
+
+          if (existing) {
+            // Update existing product (don't change barcode/sku to avoid conflicts)
+            await this.prisma.product.update({
+              where: { id: existing.id },
+              data: {
+                name: prod.name, description: prod.description,
+                category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+                price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+                wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+                packBarcode: prod.packBarcode,
+                markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+                markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+                markdownExpiresAt: prod.markdownExpiresAt,
+                minStock: prod.minStock, maxStock: prod.maxStock,
+                unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+                supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+                tenantId: prod.tenantId || null,
+                syncStatus: 'synced', syncedAt: new Date(),
+              },
+            });
+          } else {
+            // Create new product
+            await this.prisma.product.create({
+              data: {
+                id: prod.id, sku: prod.sku, barcode: prod.barcode,
+                name: prod.name, description: prod.description,
+                category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+                price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+                wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+                packBarcode: prod.packBarcode,
+                markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+                markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+                markdownExpiresAt: prod.markdownExpiresAt,
+                stock: prod.stock, minStock: prod.minStock, maxStock: prod.maxStock,
+                unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+                supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+                tenantId: prod.tenantId || null,
+                syncStatus: 'synced', syncedAt: new Date(),
+              },
+            });
+          }
           applied++;
         } catch (e: any) {
           console.log(`⬇️ Pull: skip product ${prod.sku}: ${e.message}`);
