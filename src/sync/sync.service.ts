@@ -10,6 +10,13 @@ export class SyncService implements OnModuleInit {
   private isOnline: boolean = true;
   private syncInterval: any;
 
+  // Cache: maps local employeeId → cloud employeeId (by employeeNumber)
+  private employeeIdMap: Map<string, string> = new Map();
+  // Cache: maps local registerId → cloud registerId (by code)
+  private registerIdMap: Map<string, string> = new Map();
+  // Cache: maps local productId → cloud productId (by sku)
+  private productIdMap: Map<string, string> = new Map();
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -361,6 +368,14 @@ export class SyncService implements OnModuleInit {
 
   // Synchroniser tout
   async syncAll() {
+    // Clear ID maps at start of each cycle (cloud IDs may change)
+    this.employeeIdMap.clear();
+    this.registerIdMap.clear();
+    this.productIdMap.clear();
+
+    // Build ID maps first (needed for transaction sync)
+    await this.buildIdMaps();
+
     const results = {
       products: 0,
       employees: 0,
@@ -475,6 +490,56 @@ export class SyncService implements OnModuleInit {
   }
 
   // Sync transactions vers cloud
+  // Build ID mapping caches by fetching cloud employees and registers
+  // This maps local IDs → cloud IDs using business keys (employeeNumber, code, sku)
+  private async buildIdMaps(): Promise<void> {
+    if (!this.cloudApiUrl || !this.cloudApiKey) return;
+
+    try {
+      // Fetch all cloud employees
+      const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`, {
+        headers: { 'x-api-key': this.cloudApiKey },
+      });
+      if (empRes.ok) {
+        const data = await empRes.json();
+        // Build employee map: employeeNumber → cloud id
+        for (const emp of data.employees || []) {
+          // Find local employee with same employeeNumber
+          const local = await this.prisma.employee.findFirst({
+            where: { employeeNumber: emp.employeeNumber },
+            select: { id: true },
+          }).catch(() => null);
+          if (local) {
+            this.employeeIdMap.set(local.id, emp.id);
+          }
+        }
+        // Build register map: code → cloud id
+        for (const reg of data.cashRegisters || []) {
+          const local = await this.prisma.cashRegister.findFirst({
+            where: { code: reg.code },
+            select: { id: true },
+          }).catch(() => null);
+          if (local) {
+            this.registerIdMap.set(local.id, reg.id);
+          }
+        }
+        // Build product map: sku → cloud id
+        for (const prod of data.products || []) {
+          const local = await this.prisma.product.findFirst({
+            where: { sku: prod.sku },
+            select: { id: true },
+          }).catch(() => null);
+          if (local) {
+            this.productIdMap.set(local.id, prod.id);
+          }
+        }
+        console.log(`🗺️ ID maps: ${this.employeeIdMap.size} employees, ${this.registerIdMap.size} registers, ${this.productIdMap.size} products`);
+      }
+    } catch (e: any) {
+      console.log(`🗺️ Build ID maps error: ${e.message}`);
+    }
+  }
+
   private async syncTransactions(): Promise<number> {
     const pending = await this.prisma.transaction.findMany({
       where: { syncStatus: 'pending' },
@@ -482,7 +547,26 @@ export class SyncService implements OnModuleInit {
       take: 100,
     });
 
-    return this.syncEntity('transactions', pending, 'transaction', (id) =>
+    if (pending.length === 0) return 0;
+
+    // Build ID maps if not cached
+    if (this.employeeIdMap.size === 0) {
+      await this.buildIdMaps();
+    }
+
+    // Map local IDs to cloud IDs before sending
+    const mapped = pending.map((tx) => ({
+      ...tx,
+      cashierId: this.employeeIdMap.get(tx.cashierId) || tx.cashierId,
+      registerId: tx.registerId ? (this.registerIdMap.get(tx.registerId) || tx.registerId) : null,
+      customerId: tx.customerId || null,
+      items: tx.items.map((item) => ({
+        ...item,
+        productId: this.productIdMap.get(item.productId) || item.productId,
+      })),
+    }));
+
+    return this.syncEntity('transactions', mapped, 'transaction', (id) =>
       this.prisma.transaction.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
