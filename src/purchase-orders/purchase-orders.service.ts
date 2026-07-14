@@ -15,7 +15,11 @@ export class PurchaseOrdersService {
         where,
         include: {
           supplier: true,
-          items: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
         },
         orderBy: { date: 'desc' },
         skip,
@@ -52,7 +56,11 @@ export class PurchaseOrdersService {
       where: { supplierId },
       include: {
         supplier: true,
-        items: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
       orderBy: { date: 'desc' },
     });
