@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, Headers } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { Public } from './public.decorator';
@@ -17,7 +17,7 @@ export class AuthController {
   // Lister les caissiers (pour l'écran de sélection) — public
   @Public()
   @Get('cashiers')
-  async listCashiers() {
-    return this.authService.listCashiers();
+  async listCashiers(@Headers('x-tenant-id') tenantId?: string) {
+    return this.authService.listCashiers(tenantId);
   }
 }

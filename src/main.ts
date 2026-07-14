@@ -1,8 +1,65 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { PrismaClient } from '@prisma/client';
+
+// Auto-migrate tenantId on cloud startup (one-time fix for existing data)
+async function autoMigrateTenantId() {
+  if (process.env.SKIP_TENANT_MIGRATION === 'true') return;
+
+  const prisma = new PrismaClient();
+  try {
+    // Find the first license with a subdomain set
+    const license = await prisma.license.findFirst({
+      where: { subdomain: { not: null } },
+    });
+    if (!license) {
+      await prisma.$disconnect();
+      return;
+    }
+
+    const tenantId = license.id;
+    let migrated = 0;
+
+    // Update all records that have null tenantId
+    const models = [
+      'product', 'supplier', 'transaction', 'cash_register', 'shift',
+      'employee', 'stock_movement', 'purchase_order', 'customer',
+      'expense', 'revenue', 'invoice', 'schedule', 'return',
+      'loyalty_history', 'product_batch',
+    ];
+
+    for (const model of models) {
+      try {
+        const result = await (prisma as any)[model].updateMany({
+          where: { tenantId: null },
+          data: { tenantId },
+        });
+        if (result.count > 0) {
+          migrated += result.count;
+          console.log(`  [tenant-migration] ${model}: ${result.count} records`);
+        }
+      } catch (e) {
+        // Some models might not have tenantId, skip
+      }
+    }
+
+    if (migrated > 0) {
+      console.log(`✅ [tenant-migration] Migrated ${migrated} records to tenant ${license.subdomain}`);
+    }
+  } catch (e) {
+    console.error('[tenant-migration] Error:', e);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
 
 async function bootstrap() {
+  // Run tenant migration before app starts (on cloud)
+  if (process.env.CLOUD_API_KEY) {
+    await autoMigrateTenantId();
+  }
+
   const app = await NestFactory.create(AppModule);
 
   // CORS dynamique: accepter les origins configurés + tous les sous-domaines vercel.app

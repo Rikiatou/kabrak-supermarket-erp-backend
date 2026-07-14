@@ -81,11 +81,12 @@ export class AuthService {
   }
 
   // Lister les employés (pour l'écran de login - sélection caissier)
-  async listCashiers() {
+  async listCashiers(tenantId?: string) {
     return this.prisma.employee.findMany({
       where: {
         status: 'active',
         role: { in: ['cashier', 'boss', 'accountant', 'stockist', 'manager'] },
+        ...(tenantId ? { tenantId } : {}),
       },
       select: {
         id: true,
