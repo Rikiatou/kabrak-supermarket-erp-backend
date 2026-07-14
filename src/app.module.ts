@@ -26,6 +26,7 @@ import { LicensesModule } from './licenses/licenses.module';
 import { ReturnsModule } from './returns/returns.module';
 import { BatchesModule } from './batches/batches.module';
 import { CloudSyncModule } from './cloud-sync/cloud-sync.module';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
   imports: [
@@ -34,6 +35,9 @@ import { CloudSyncModule } from './cloud-sync/cloud-sync.module';
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'production' ? '.env' : '.env.local',
     }),
+
+    // Multi-tenant: doit etre avant les autres modules pour le middleware
+    TenantModule,
 
     // Modules
     DatabaseModule,

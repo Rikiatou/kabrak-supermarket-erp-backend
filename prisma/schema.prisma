@@ -22,7 +22,7 @@ model Product {
   category    String
   subCategory String?
   brand       String?
-  
+
   // Prix (en centimes FCFA pour éviter les float)
   price       Int      // Prix vente unitaire
   costPrice   Int      // Prix achat
@@ -59,6 +59,10 @@ model Product {
   imageUrl    String?
   isActive    Boolean  @default(true)
 
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Sync cloud
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
@@ -80,7 +84,8 @@ model Product {
   @@index([isActive])                   // Produits actifs seulement
   @@index([supplierId])                 // Produits par fournisseur
   @@index([markdownPrice])              // Produits en markdown actif
-  
+  @@index([tenantId])                   // Multi-tenant
+
   @@map("products")
 }
 
@@ -98,17 +103,20 @@ model Supplier {
   rating        Float    @default(0)
   isActive      Boolean  @default(true)
   licenseKey    String?
+  tenantId      String?
+  tenant        License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   syncStatus    String   @default("pending")
   syncedAt      DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   products       Product[]
   purchaseOrders PurchaseOrder[]
-  
+
   @@index([name])
   @@index([isActive])
   @@index([licenseKey])
+  @@index([tenantId])
 
   @@map("suppliers")
 }
@@ -145,17 +153,21 @@ model Transaction {
   
   // Statut
   status        String   @default("completed") // "completed", "refunded", "cancelled"
-  
+
+  // Multi-tenant
+  tenantId      String?
+  tenant        License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Synchronisation (OFFLINE-FIRST)
   syncStatus    String   @default("pending") // "pending", "synced", "failed"
   syncedAt      DateTime?
   syncError     String?
-  
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   items         TransactionItem[]
-  
+
   @@index([date])
   @@index([cashierId])
   @@index([registerId])
@@ -163,7 +175,8 @@ model Transaction {
   @@index([syncStatus])           // CRITIQUE pour offline-first
   @@index([transactionNumber])
   @@index([customerId])
-  
+  @@index([tenantId])
+
   @@map("transactions")
 }
 
@@ -203,21 +216,26 @@ model CashRegister {
   location    String?  // "Entrée principale", "Sortie"
   isActive    Boolean  @default(true)
 
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Sync cloud
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   transactions Transaction[]
   shifts       Shift[]
   schedules    Schedule[]
-  
+
   @@index([code])
   @@index([status])
   @@index([isActive])
-  
+  @@index([tenantId])
+
   @@map("cash_registers")
 }
 
@@ -243,6 +261,10 @@ model Shift {
   employeeName  String?
   registerName  String?
 
+  // Multi-tenant
+  tenantId      String?
+  tenant        License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Sync
   syncStatus    String   @default("pending")
   syncedAt      DateTime?
@@ -252,6 +274,7 @@ model Shift {
   @@index([openedAt])
   @@index([status])
   @@index([syncStatus])
+  @@index([tenantId])
 
   @@map("shifts")
 }
@@ -276,6 +299,8 @@ model Employee {
   // Auth (simple pour commencer)
   pin           String?  // PIN 4 chiffres pour login caisse
   licenseKey    String?
+  tenantId      String?
+  tenant        License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   // Sync cloud
   syncStatus    String   @default("pending")
@@ -293,6 +318,7 @@ model Employee {
   @@index([role])
   @@index([status])
   @@index([licenseKey])
+  @@index([tenantId])
 
   @@map("employees")
 }
@@ -315,17 +341,22 @@ model StockMovement {
   notes       String?
   createdBy   String?  // ID employé
   employee    Employee? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
-  
+
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Synchronisation
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@index([productId])
   @@index([type])
   @@index([createdAt])
   @@index([syncStatus])
+  @@index([tenantId])
   
   @@map("stock_movements")
 }
@@ -348,19 +379,24 @@ model PurchaseOrder {
   status       String   @default("draft") // "draft", "sent", "received", "cancelled"
   syncStatus   String   @default("pending")
   syncedAt     DateTime?
-  
+
   notes        String?
   createdBy    String?  // employeeId who created the order
+
+  // Multi-tenant
+  tenantId     String?
+  tenant       License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   items        PurchaseOrderItem[]
-  
+
   @@index([supplierId])
   @@index([status])
   @@index([date])
   @@index([orderNumber])
+  @@index([tenantId])
   
   @@map("purchase_orders")
 }
@@ -405,21 +441,26 @@ model Customer {
   isActive    Boolean  @default(true)
   createdBy   String?  // employeeId who created the customer
 
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Sync
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   transactions    Transaction[]
   loyaltyHistory  LoyaltyHistory[]
   invoices        Invoice[]
-  
+
   @@index([phone])
   @@index([customerNumber])
   @@index([tier])
   @@index([syncStatus])
+  @@index([tenantId])
   
   @@map("customers")
 }
@@ -433,14 +474,20 @@ model LoyaltyHistory {
   points      Int      // Positif = gagné, Négatif = dépensé
   reason      String   // "purchase", "reward_redeemed", "bonus"
   reference   String?  // ID transaction
+
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@index([customerId])
   @@index([createdAt])
   @@index([syncStatus])
+  @@index([tenantId])
   
   @@map("loyalty_history")
 }
@@ -457,16 +504,21 @@ model SyncLog {
   
   status      String   // "pending", "synced", "failed"
   error       String?
-  
+
   attempts    Int      @default(0)
   lastAttempt DateTime?
-  
+
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   createdAt   DateTime @default(now())
   syncedAt    DateTime?
-  
+
   @@index([status])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([tenantId])
   
   @@map("sync_logs")
 }
@@ -484,13 +536,19 @@ model Expense {
   supplier    String?
   status      String   @default("paid") // "paid", "pending"
   createdBy   String?  // employeeId who created the expense
+
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
   createdAt   DateTime @default(now())
-  
+
   @@index([date])
   @@index([category])
   @@index([syncStatus])
+  @@index([tenantId])
   @@map("expenses")
 }
 
@@ -503,13 +561,19 @@ model Revenue {
   category    String   // "sales", "services", "other"
   description String
   amount      Int
+
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
   createdAt   DateTime @default(now())
-  
+
   @@index([date])
   @@index([category])
   @@index([syncStatus])
+  @@index([tenantId])
   @@map("revenues")
 }
 
@@ -550,16 +614,20 @@ model Invoice {
   notes       String?
   createdBy   String?  // employeeId who created the invoice
 
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Sync
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
 
   items       InvoiceItem[]
   payments    InvoicePayment[]
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([number])
   @@index([status])
   @@index([date])
@@ -567,6 +635,7 @@ model Invoice {
   @@index([clientName])
   @@index([syncStatus])
   @@index([createdBy])
+  @@index([tenantId])
   
   @@map("invoices")
 }
@@ -640,19 +709,25 @@ model Schedule {
   breakEnd    String?  // "13:00"
   
   isActive    Boolean  @default(true)
+
+  // Multi-tenant
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
-  
+
   notes       String?  // "Remplacement", "Heures supplémentaires", etc.
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@unique([employeeId, dayOfWeek, startTime]) // Un employé ne peut pas être 2x au même créneau
   @@index([employeeId])
   @@index([registerId])
   @@index([dayOfWeek])
   @@index([syncStatus])
+  @@index([tenantId])
   
   @@map("schedules")
 }
@@ -675,6 +750,10 @@ model ProductReturn {
   note                  String?
   createdBy             String?  // employeeId of cashier who processed the return
 
+  // Multi-tenant
+  tenantId              String?
+  tenant                License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   // Sync
   syncStatus            String   @default("pending")
   syncedAt              DateTime?
@@ -686,6 +765,7 @@ model ProductReturn {
   @@index([returnDate])
   @@index([createdBy])
   @@index([syncStatus])
+  @@index([tenantId])
 
   @@map("returns")
 }
@@ -720,6 +800,7 @@ model License {
   clientEmail     String
   clientPhone     String?
   clientAddress   String?
+  subdomain       String?  @unique // "easyshop", "bakaryshop" -> easyshop.kabrak-retail.com
   type            String   @default("STANDARD") // "STANDARD", "MULTI_STORE"
   maxStores       Int      @default(1)
   durationMonths  Int      @default(12)
@@ -735,6 +816,25 @@ model License {
 
   config          ClientConfig?
   stores          Store[]
+
+  // Multi-tenant: relations inverses
+  products        Product[]
+  suppliers       Supplier[]
+  transactions    Transaction[]
+  cashRegisters   CashRegister[]
+  shifts          Shift[]
+  employees       Employee[]
+  stockMovements  StockMovement[]
+  purchaseOrders  PurchaseOrder[]
+  customers       Customer[]
+  loyaltyHistory  LoyaltyHistory[]
+  syncLogs        SyncLog[]
+  expenses        Expense[]
+  revenues        Revenue[]
+  invoices        Invoice[]
+  schedules       Schedule[]
+  returns         ProductReturn[]
+  batches         ProductBatch[]
 
   @@index([licenseKey])
   @@index([status])
@@ -814,6 +914,8 @@ model ProductBatch {
   expiryDate  DateTime?
   receivedDate DateTime @default(now())
   licenseKey  String?
+  tenantId    String?
+  tenant      License? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   syncStatus  String   @default("pending")
   syncedAt    DateTime?
 
@@ -823,6 +925,7 @@ model ProductBatch {
   @@index([productId])
   @@index([expiryDate])
   @@index([licenseKey])
+  @@index([tenantId])
   @@index([syncStatus])
 
   @@map("product_batches")

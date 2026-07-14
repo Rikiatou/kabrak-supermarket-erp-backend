@@ -68,6 +68,22 @@ export class LicensesService {
       .replace(/[^A-Z0-9]/g, '')
       .substring(0, 12);
 
+    // Generer un subdomain si non fourni
+    let subdomain = dto.subdomain;
+    if (!subdomain) {
+      subdomain = dto.clientName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .substring(0, 20);
+    }
+    // Verifier que le subdomain est unique
+    const existingSubdomain = await this.prisma.license.findUnique({
+      where: { subdomain },
+    });
+    if (existingSubdomain) {
+      subdomain = `${subdomain}-${Date.now().toString(36).slice(-4)}`;
+    }
+
     // Créer la licence + config client par défaut + 1 magasin par défaut
     const license = await this.prisma.license.create({
       data: {
@@ -76,6 +92,7 @@ export class LicensesService {
         clientEmail: dto.clientEmail,
         clientPhone: dto.clientPhone,
         clientAddress: dto.clientAddress,
+        subdomain,
         type: dto.type,
         maxStores,
         durationMonths: dto.durationMonths,
@@ -128,6 +145,45 @@ export class LicensesService {
   // ========================================
   // VALIDATION DE LICENCE (PUBLIC)
   // ========================================
+  // ========================================
+  // RÉSOLUTION TENANT PAR SUBDOMAIN
+  // ========================================
+  async resolveBySubdomain(subdomain: string) {
+    const license = await this.prisma.license.findUnique({
+      where: { subdomain: subdomain.toLowerCase() },
+      include: {
+        config: true,
+        stores: { where: { isActive: true } },
+      },
+    });
+
+    if (!license) {
+      throw new NotFoundException(`Aucun client trouvé pour ${subdomain}.kabrak-retail.com`);
+    }
+
+    if (license.status !== 'ACTIVE') {
+      throw new BadRequestException(`Ce compte est ${license.status.toLowerCase()}. Contactez le support.`);
+    }
+
+    // Retourner les infos publiques (pas de licenseKey)
+    return {
+      tenantId: license.id,
+      clientName: license.clientName,
+      subdomain: license.subdomain,
+      supermarketName: license.config?.supermarketName || license.clientName,
+      logoUrl: license.config?.logoUrl || null,
+      primaryColor: license.config?.primaryColor || '#2563eb',
+      currency: license.config?.currency || 'FCFA',
+      stores: license.stores.map((s) => ({
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        city: s.city,
+      })),
+      expiresAt: license.expiresAt,
+    };
+  }
+
   async validate(licenseKey: string) {
     const license = await this.prisma.license.findUnique({
       where: { licenseKey },

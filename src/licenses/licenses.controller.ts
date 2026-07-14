@@ -39,6 +39,13 @@ export class LicensesController {
     return this.licensesService.validate(dto.licenseKey);
   }
 
+  // Resolver un tenant par subdomain (pour multi-tenant SaaS)
+  @Public()
+  @Get('resolve/:subdomain')
+  async resolveBySubdomain(@Param('subdomain') subdomain: string) {
+    return this.licensesService.resolveBySubdomain(subdomain);
+  }
+
   // Obtenir le statut d'une licence
   @Public()
   @Get(':licenseKey/status')

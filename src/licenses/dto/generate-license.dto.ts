@@ -14,6 +14,11 @@ export class GenerateLicenseDto {
   @IsString()
   clientAddress?: string;
 
+  // Subdomain pour multi-tenant SaaS (ex: "easyshop" -> easyshop.kabrak-retail.com)
+  @IsOptional()
+  @IsString()
+  subdomain?: string;
+
   // STANDARD (1 magasin) ou MULTI_STORE (X magasins)
   @IsIn(['STANDARD', 'MULTI_STORE'])
   type: 'STANDARD' | 'MULTI_STORE';

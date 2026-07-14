@@ -9,6 +9,7 @@ export interface AuthUser {
   lastName: string;
   role: string;
   department: string;
+  tenantId?: string | null;
 }
 
 @Injectable()
@@ -40,11 +41,12 @@ export class AuthService {
       lastName: employee.lastName,
       role: employee.role,
       department: employee.department,
+      tenantId: employee.tenantId || null,
     };
 
     // Token simple (en production: JWT)
     const token = Buffer.from(
-      JSON.stringify({ id: user.id, ts: Date.now() })
+      JSON.stringify({ id: user.id, tenantId: user.tenantId, ts: Date.now() })
     ).toString('base64');
 
     return { user, token };
@@ -71,6 +73,7 @@ export class AuthService {
         lastName: employee.lastName,
         role: employee.role,
         department: employee.department,
+        tenantId: employee.tenantId || decoded.tenantId || null,
       };
     } catch {
       return null;

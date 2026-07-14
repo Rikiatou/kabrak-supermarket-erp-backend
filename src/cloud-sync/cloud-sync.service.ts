@@ -13,6 +13,7 @@ export class CloudSyncService {
       price, costPrice, taxRate, wholesalePrice, packQuantity, packBarcode,
       markdownPrice, markdownReason, markdownNote, markdownStartsAt, markdownExpiresAt,
       stock, minStock, maxStock, unit, expiryDate, supplierId, imageUrl, isActive,
+      tenantId,
       createdAt, updatedAt,
     } = data;
 
@@ -24,6 +25,7 @@ export class CloudSyncService {
         markdownPrice, markdownReason, markdownNote, markdownStartsAt, markdownExpiresAt,
         stock, minStock, maxStock, unit, expiryDate: expiryDate ? new Date(expiryDate) : null,
         supplierId, imageUrl, isActive,
+        tenantId: tenantId || null,
         createdAt: createdAt ? new Date(createdAt) : undefined,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
@@ -34,6 +36,7 @@ export class CloudSyncService {
         markdownPrice, markdownReason, markdownNote, markdownStartsAt, markdownExpiresAt,
         stock, minStock, maxStock, unit, expiryDate: expiryDate ? new Date(expiryDate) : null,
         supplierId, imageUrl, isActive,
+        tenantId: tenantId || null,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
       },
@@ -43,7 +46,7 @@ export class CloudSyncService {
   async upsertEmployee(data: any) {
     const {
       id, employeeNumber, firstName, lastName, role, department,
-      phone, email, hireDate, status, pin, licenseKey,
+      phone, email, hireDate, status, pin, licenseKey, tenantId,
       createdAt, updatedAt,
     } = data;
 
@@ -52,6 +55,7 @@ export class CloudSyncService {
       create: {
         id, employeeNumber, firstName, lastName, role, department,
         phone, email, hireDate: new Date(hireDate), status, pin, licenseKey,
+        tenantId: tenantId || null,
         createdAt: createdAt ? new Date(createdAt) : undefined,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
@@ -68,7 +72,7 @@ export class CloudSyncService {
   async upsertCashRegister(data: any) {
     const {
       id, name, code, status, openingCash, currentCash,
-      location, isActive, createdAt, updatedAt,
+      location, isActive, tenantId, createdAt, updatedAt,
     } = data;
 
     return this.prisma.cashRegister.upsert({
@@ -76,6 +80,7 @@ export class CloudSyncService {
       create: {
         id, name, code, status, openingCash, currentCash,
         location, isActive,
+        tenantId: tenantId || null,
         createdAt: createdAt ? new Date(createdAt) : undefined,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
@@ -83,6 +88,7 @@ export class CloudSyncService {
       update: {
         name, code, status, openingCash, currentCash,
         location, isActive,
+        tenantId: tenantId || null,
         updatedAt: updatedAt ? new Date(updatedAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
       },
