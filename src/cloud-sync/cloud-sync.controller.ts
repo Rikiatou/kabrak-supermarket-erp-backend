@@ -1,6 +1,8 @@
 import {
   Controller,
   Post,
+  Get,
+  Query,
   Body,
   Headers,
   HttpException,
@@ -131,5 +133,17 @@ export class CloudSyncController {
   upsertStockMovement(@Body() body: any, @Headers() headers: Record<string, string>) {
     this.verifyApiKey(headers);
     return this.cloudSyncService.upsertStockMovement(body);
+  }
+
+  // REVERSE SYNC: Cloud → Local
+  // Returns all entities modified since the given timestamp
+  @Get('pull')
+  async pullChanges(
+    @Query('since') since: string,
+    @Headers() headers: Record<string, string>,
+  ) {
+    this.verifyApiKey(headers);
+    const sinceDate = since ? new Date(since) : new Date(0);
+    return this.cloudSyncService.pullChanges(sinceDate);
   }
 }

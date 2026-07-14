@@ -375,4 +375,95 @@ export class CloudSyncService {
       },
     });
   }
+
+  // REVERSE SYNC: Pull changes from cloud since given timestamp
+  // Returns entities that were modified since the given date
+  // Local will upsert these into its own DB
+  async pullChanges(since: Date) {
+    const [
+      employees,
+      products,
+      cashRegisters,
+      customers,
+      suppliers,
+      schedules,
+    ] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { updatedAt: { gt: since } },
+        select: {
+          id: true, employeeNumber: true, firstName: true, lastName: true,
+          role: true, department: true, phone: true, email: true,
+          hireDate: true, status: true, pin: true, licenseKey: true,
+          tenantId: true, createdAt: true, updatedAt: true,
+        },
+      }).catch(() => []),
+      this.prisma.product.findMany({
+        where: { updatedAt: { gt: since } },
+        select: {
+          id: true, sku: true, barcode: true, name: true, description: true,
+          category: true, subCategory: true, brand: true,
+          price: true, costPrice: true, taxRate: true, wholesalePrice: true,
+          packQuantity: true, packBarcode: true,
+          markdownPrice: true, markdownReason: true, markdownNote: true,
+          markdownStartsAt: true, markdownExpiresAt: true,
+          stock: true, minStock: true, maxStock: true, unit: true,
+          expiryDate: true, supplierId: true, imageUrl: true, isActive: true,
+          tenantId: true, createdAt: true, updatedAt: true,
+        },
+      }).catch(() => []),
+      this.prisma.cashRegister.findMany({
+        where: { updatedAt: { gt: since } },
+        select: {
+          id: true, name: true, code: true, status: true,
+          openingCash: true, currentCash: true, location: true, isActive: true,
+          tenantId: true, createdAt: true, updatedAt: true,
+        },
+      }).catch(() => []),
+      this.prisma.customer.findMany({
+        where: { updatedAt: { gt: since } },
+        select: {
+          id: true, customerNumber: true, firstName: true, lastName: true,
+          phone: true, email: true, points: true, totalSpent: true,
+          tier: true, isActive: true, createdBy: true,
+          tenantId: true, createdAt: true, updatedAt: true,
+        },
+      }).catch(() => []),
+      this.prisma.supplier.findMany({
+        where: { updatedAt: { gt: since } },
+        select: {
+          id: true, name: true, contact: true, phone: true, email: true,
+          address: true, paymentTerms: true, rating: true, isActive: true,
+          licenseKey: true, tenantId: true, createdAt: true, updatedAt: true,
+        },
+      }).catch(() => []),
+      this.prisma.schedule.findMany({
+        where: { updatedAt: { gt: since } },
+        select: {
+          id: true, employeeId: true, registerId: true, dayOfWeek: true,
+          startTime: true, endTime: true, breakStart: true, breakEnd: true,
+          isActive: true, tenantId: true, notes: true,
+          createdAt: true, updatedAt: true,
+        },
+      }).catch(() => []),
+    ]);
+
+    return {
+      since: since.toISOString(),
+      pulledAt: new Date().toISOString(),
+      counts: {
+        employees: employees.length,
+        products: products.length,
+        cashRegisters: cashRegisters.length,
+        customers: customers.length,
+        suppliers: suppliers.length,
+        schedules: schedules.length,
+      },
+      employees,
+      products,
+      cashRegisters,
+      customers,
+      suppliers,
+      schedules,
+    };
+  }
 }

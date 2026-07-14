@@ -46,7 +46,255 @@ export class SyncService implements OnModuleInit {
     }
 
     if (this.isOnline && this.syncEnabled) {
+      // Push local → cloud
       await this.syncAll();
+      // Pull cloud → local (reverse sync)
+      await this.pullFromCloud();
+    }
+  }
+
+  // REVERSE SYNC: Pull changes from cloud and apply locally
+  private async pullFromCloud(): Promise<void> {
+    if (!this.cloudApiUrl || !this.cloudApiKey) return;
+
+    try {
+      // Get last pull timestamp from DB
+      const lastPull = await this.prisma.syncLog.findFirst({
+        where: { entityType: 'reverse_sync', action: 'pull' },
+        orderBy: { lastAttempt: 'desc' },
+      }).catch(() => null);
+
+      const since = lastPull?.lastAttempt?.toISOString() || new Date(0).toISOString();
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(
+        `${this.cloudApiUrl}/cloud-sync/pull?since=${encodeURIComponent(since)}`,
+        {
+          headers: { 'x-api-key': this.cloudApiKey },
+          signal: controller.signal,
+        },
+      );
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.log('⬇️ Pull: cloud returned', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      console.log(`⬇️ Pull: ${data.counts.employees} employees, ${data.counts.products} products, ${data.counts.cashRegisters} registers, ${data.counts.customers} customers, ${data.counts.suppliers} suppliers, ${data.counts.schedules} schedules`);
+
+      let applied = 0;
+
+      // Apply employees
+      for (const emp of data.employees || []) {
+        try {
+          await this.prisma.employee.upsert({
+            where: { employeeNumber: emp.employeeNumber },
+            create: {
+              id: emp.id, employeeNumber: emp.employeeNumber,
+              firstName: emp.firstName, lastName: emp.lastName,
+              role: emp.role, department: emp.department,
+              phone: emp.phone, email: emp.email,
+              hireDate: emp.hireDate ? new Date(emp.hireDate) : new Date(),
+              status: emp.status, pin: emp.pin, licenseKey: emp.licenseKey,
+              tenantId: emp.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+            update: {
+              firstName: emp.firstName, lastName: emp.lastName,
+              role: emp.role, department: emp.department,
+              phone: emp.phone, email: emp.email,
+              status: emp.status, pin: emp.pin, licenseKey: emp.licenseKey,
+              tenantId: emp.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+          applied++;
+        } catch (e: any) {
+          console.log(`⬇️ Pull: skip employee ${emp.employeeNumber}: ${e.message}`);
+        }
+      }
+
+      // Apply products
+      for (const prod of data.products || []) {
+        try {
+          await this.prisma.product.upsert({
+            where: { sku: prod.sku },
+            create: {
+              id: prod.id, sku: prod.sku, barcode: prod.barcode,
+              name: prod.name, description: prod.description,
+              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+              packBarcode: prod.packBarcode,
+              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+              markdownExpiresAt: prod.markdownExpiresAt,
+              stock: prod.stock, minStock: prod.minStock, maxStock: prod.maxStock,
+              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+              tenantId: prod.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+            update: {
+              name: prod.name, description: prod.description,
+              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+              packBarcode: prod.packBarcode,
+              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+              markdownExpiresAt: prod.markdownExpiresAt,
+              minStock: prod.minStock, maxStock: prod.maxStock,
+              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+              tenantId: prod.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+          applied++;
+        } catch (e: any) {
+          console.log(`⬇️ Pull: skip product ${prod.sku}: ${e.message}`);
+        }
+      }
+
+      // Apply cash registers
+      for (const reg of data.cashRegisters || []) {
+        try {
+          await this.prisma.cashRegister.upsert({
+            where: { code: reg.code },
+            create: {
+              id: reg.id, name: reg.name, code: reg.code, status: reg.status,
+              openingCash: reg.openingCash, currentCash: reg.currentCash,
+              location: reg.location, isActive: reg.isActive,
+              tenantId: reg.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+            update: {
+              name: reg.name, status: reg.status,
+              openingCash: reg.openingCash, currentCash: reg.currentCash,
+              location: reg.location, isActive: reg.isActive,
+              tenantId: reg.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+          applied++;
+        } catch (e: any) {
+          console.log(`⬇️ Pull: skip register ${reg.code}: ${e.message}`);
+        }
+      }
+
+      // Apply customers
+      for (const cust of data.customers || []) {
+        try {
+          await this.prisma.customer.upsert({
+            where: { customerNumber: cust.customerNumber },
+            create: {
+              id: cust.id, customerNumber: cust.customerNumber,
+              firstName: cust.firstName, lastName: cust.lastName,
+              phone: cust.phone, email: cust.email || null,
+              points: cust.points || 0, totalSpent: cust.totalSpent || 0,
+              tier: cust.tier || 'bronze', isActive: cust.isActive ?? true,
+              createdBy: cust.createdBy || null,
+              tenantId: cust.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+            update: {
+              firstName: cust.firstName, lastName: cust.lastName,
+              phone: cust.phone, email: cust.email || null,
+              points: cust.points || 0, totalSpent: cust.totalSpent || 0,
+              tier: cust.tier || 'bronze', isActive: cust.isActive ?? true,
+              tenantId: cust.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+          applied++;
+        } catch (e: any) {
+          console.log(`⬇️ Pull: skip customer ${cust.customerNumber}: ${e.message}`);
+        }
+      }
+
+      // Apply suppliers
+      for (const sup of data.suppliers || []) {
+        try {
+          await this.prisma.supplier.upsert({
+            where: { id: sup.id },
+            create: {
+              id: sup.id, name: sup.name, contact: sup.contact,
+              phone: sup.phone, email: sup.email || null,
+              address: sup.address || null,
+              paymentTerms: sup.paymentTerms || '30 jours',
+              rating: sup.rating || 0, isActive: sup.isActive ?? true,
+              licenseKey: sup.licenseKey || null,
+              tenantId: sup.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+            update: {
+              name: sup.name, contact: sup.contact,
+              phone: sup.phone, email: sup.email || null,
+              address: sup.address || null,
+              paymentTerms: sup.paymentTerms || '30 jours',
+              rating: sup.rating || 0, isActive: sup.isActive ?? true,
+              licenseKey: sup.licenseKey || null,
+              tenantId: sup.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+          applied++;
+        } catch (e: any) {
+          console.log(`⬇️ Pull: skip supplier ${sup.id}: ${e.message}`);
+        }
+      }
+
+      // Apply schedules
+      for (const sch of data.schedules || []) {
+        try {
+          await this.prisma.schedule.upsert({
+            where: { id: sch.id },
+            create: {
+              id: sch.id, employeeId: sch.employeeId, registerId: sch.registerId,
+              dayOfWeek: sch.dayOfWeek, startTime: sch.startTime,
+              endTime: sch.endTime, breakStart: sch.breakStart || null,
+              breakEnd: sch.breakEnd || null, isActive: sch.isActive,
+              notes: sch.notes || null,
+              tenantId: sch.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+            update: {
+              employeeId: sch.employeeId, registerId: sch.registerId,
+              dayOfWeek: sch.dayOfWeek, startTime: sch.startTime,
+              endTime: sch.endTime, breakStart: sch.breakStart || null,
+              breakEnd: sch.breakEnd || null, isActive: sch.isActive,
+              notes: sch.notes || null,
+              tenantId: sch.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+          applied++;
+        } catch (e: any) {
+          console.log(`⬇️ Pull: skip schedule ${sch.id}: ${e.message}`);
+        }
+      }
+
+      // Log the pull
+      await this.prisma.syncLog.create({
+        data: {
+          entityType: 'reverse_sync',
+          entityId: 'pull',
+          action: 'pull',
+          status: 'success',
+          attempts: 1,
+          lastAttempt: new Date(),
+        },
+      }).catch(() => {});
+
+      console.log(`⬇️ Pull complete: ${applied} entities applied`);
+    } catch (e: any) {
+      console.log(`⬇️ Pull error: ${e.message}`);
     }
   }
 
