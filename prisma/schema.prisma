@@ -150,7 +150,11 @@ model Transaction {
   // Client (optionnel - fidélité)
   customerId    String?
   customer      Customer? @relation(fields: [customerId], references: [id])
-  
+
+  // Lien facture (pour les paiements INV-PAY)
+  invoiceId     String?
+  invoice       Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
   // Statut
   status        String   @default("completed") // "completed", "refunded", "cancelled"
 
@@ -176,6 +180,7 @@ model Transaction {
   @@index([transactionNumber])
   @@index([customerId])
   @@index([tenantId])
+  @@index([invoiceId])
 
   @@map("transactions")
 }
@@ -624,6 +629,7 @@ model Invoice {
 
   items       InvoiceItem[]
   payments    InvoicePayment[]
+  transactions Transaction[] // Transactions INV-PAY liees
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

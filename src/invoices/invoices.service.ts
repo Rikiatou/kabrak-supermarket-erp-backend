@@ -186,6 +186,7 @@ export class InvoicesService {
             change: 0,
             status: 'completed',
             syncStatus: 'pending',
+            invoiceId,
           },
         });
       } catch (e) {
@@ -340,18 +341,14 @@ export class InvoicesService {
       }
     }
 
-    // 2. Supprimer les transactions INV-PAY-* liees a cette facture
-    // On cherche les transactions creees le meme jour avec le montant des payments
+    // 2. Supprimer les transactions INV-PAY liees a cette facture
     if (invoice.payments.length > 0) {
       try {
-        // Supprimer les stockMovements liees aux payments INV-PAY
-        for (const payment of invoice.payments) {
-          // Les transactions INV-PAY n'ont pas de reference directe a l'invoice
-          // mais on peut les trouver par transactionNumber pattern + amount
-          // Pour la simplicite, on supprime par date approximative + montant
-        }
+        await this.prisma.transaction.deleteMany({
+          where: { invoiceId: id },
+        });
       } catch (e) {
-        console.error('Failed to clean INV-PAY transactions:', e);
+        console.error('Failed to delete INV-PAY transactions:', e);
       }
     }
 
