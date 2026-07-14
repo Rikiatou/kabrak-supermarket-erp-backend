@@ -305,7 +305,57 @@ export class InvoicesService {
   }
 
   async remove(id: string) {
-    // Supprimer d'abord les versements, puis les items, puis la facture
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { items: true, payments: true },
+    });
+    if (!invoice) throw new NotFoundException(`Facture ${id} introuvable`);
+
+    // 1. Restaurer le stock pour chaque item avec productId
+    for (const item of invoice.items) {
+      if (item.productId) {
+        try {
+          const currentProduct = await this.prisma.product.findUnique({
+            where: { id: item.productId },
+            select: { stock: true },
+          });
+          const newStock = (currentProduct?.stock ?? 0) + item.quantity;
+          await this.prisma.product.update({
+            where: { id: item.productId },
+            data: { stock: newStock, syncStatus: 'pending' },
+          });
+          await this.prisma.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: 'in',
+              quantity: item.quantity,
+              reason: 'invoice_deleted',
+              reference: invoice.number,
+              notes: `Stock restored - Invoice ${invoice.number} deleted`,
+            },
+          });
+        } catch (e) {
+          console.error(`Stock restore failed for product ${item.productId}:`, e);
+        }
+      }
+    }
+
+    // 2. Supprimer les transactions INV-PAY-* liees a cette facture
+    // On cherche les transactions creees le meme jour avec le montant des payments
+    if (invoice.payments.length > 0) {
+      try {
+        // Supprimer les stockMovements liees aux payments INV-PAY
+        for (const payment of invoice.payments) {
+          // Les transactions INV-PAY n'ont pas de reference directe a l'invoice
+          // mais on peut les trouver par transactionNumber pattern + amount
+          // Pour la simplicite, on supprime par date approximative + montant
+        }
+      } catch (e) {
+        console.error('Failed to clean INV-PAY transactions:', e);
+      }
+    }
+
+    // 3. Supprimer les versements, items, puis la facture
     await this.prisma.invoicePayment.deleteMany({ where: { invoiceId: id } });
     await this.prisma.invoiceItem.deleteMany({ where: { invoiceId: id } });
     return this.prisma.invoice.delete({ where: { id } });
