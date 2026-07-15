@@ -115,9 +115,10 @@ export class SyncService implements OnModuleInit {
               firstName: emp.firstName, lastName: emp.lastName,
               role: emp.role, department: emp.department,
               phone: emp.phone, email: emp.email,
-              status: emp.status, pin: emp.pin, licenseKey: emp.licenseKey,
+              status: emp.status, licenseKey: emp.licenseKey,
               tenantId: emp.tenantId || null,
               syncStatus: 'synced', syncedAt: new Date(),
+              // NOTE: pin is NOT updated from cloud — local PIN is authoritative
             },
           });
           applied++;
@@ -505,47 +506,74 @@ export class SyncService implements OnModuleInit {
   // Sync transactions vers cloud
   // Build ID mapping caches by fetching cloud employees and registers
   // This maps local IDs → cloud IDs using business keys (employeeNumber, code, sku)
+  // OPTIMIZED: uses batch queries instead of 19000+ individual findFirst
   private async buildIdMaps(): Promise<void> {
     if (!this.cloudApiUrl || !this.cloudApiKey) return;
 
     try {
-      // Fetch all cloud employees
+      // Fetch all cloud entities in one request
       const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`, {
         headers: { 'x-api-key': this.cloudApiKey },
       });
       if (empRes.ok) {
         const data = await empRes.json();
-        // Build employee map: employeeNumber → cloud id
-        for (const emp of data.employees || []) {
-          // Find local employee with same employeeNumber
-          const local = await this.prisma.employee.findFirst({
-            where: { employeeNumber: emp.employeeNumber },
-            select: { id: true },
-          }).catch(() => null);
-          if (local) {
-            this.employeeIdMap.set(local.id, emp.id);
+
+        // Batch: fetch all local employees in ONE query
+        const cloudEmpNums = (data.employees || []).map((e: any) => e.employeeNumber).filter(Boolean);
+        if (cloudEmpNums.length > 0) {
+          const localEmps = await this.prisma.employee.findMany({
+            where: { employeeNumber: { in: cloudEmpNums } },
+            select: { id: true, employeeNumber: true },
+          });
+          const localEmpMap = new Map(localEmps.map(e => [e.employeeNumber, e.id]));
+          for (const emp of data.employees || []) {
+            const localId = localEmpMap.get(emp.employeeNumber);
+            if (localId) {
+              this.employeeIdMap.set(localId, emp.id);
+            }
           }
         }
-        // Build register map: code → cloud id
-        for (const reg of data.cashRegisters || []) {
-          const local = await this.prisma.cashRegister.findFirst({
-            where: { code: reg.code },
-            select: { id: true },
-          }).catch(() => null);
-          if (local) {
-            this.registerIdMap.set(local.id, reg.id);
+
+        // Batch: fetch all local registers in ONE query
+        const cloudRegCodes = (data.cashRegisters || []).map((r: any) => r.code).filter(Boolean);
+        if (cloudRegCodes.length > 0) {
+          const localRegs = await this.prisma.cashRegister.findMany({
+            where: { code: { in: cloudRegCodes } },
+            select: { id: true, code: true },
+          });
+          const localRegMap = new Map(localRegs.map(r => [r.code, r.id]));
+          for (const reg of data.cashRegisters || []) {
+            const localId = localRegMap.get(reg.code);
+            if (localId) {
+              this.registerIdMap.set(localId, reg.id);
+            }
           }
         }
-        // Build product map: sku → cloud id
-        for (const prod of data.products || []) {
-          const local = await this.prisma.product.findFirst({
-            where: { sku: prod.sku },
-            select: { id: true },
-          }).catch(() => null);
-          if (local) {
-            this.productIdMap.set(local.id, prod.id);
+
+        // Batch: fetch all local products in ONE query
+        // Only build product map if there are pending transactions (saves resources)
+        const pendingTxCount = await this.prisma.transaction.count({ where: { syncStatus: 'pending' } }).catch(() => 0);
+        if (pendingTxCount > 0) {
+          const cloudSkus = (data.products || []).map((p: any) => p.sku).filter(Boolean);
+          if (cloudSkus.length > 0) {
+            // Fetch in chunks of 1000 to avoid memory issues
+            for (let i = 0; i < cloudSkus.length; i += 1000) {
+              const chunk = cloudSkus.slice(i, i + 1000);
+              const localProds = await this.prisma.product.findMany({
+                where: { sku: { in: chunk } },
+                select: { id: true, sku: true },
+              });
+              const localProdMap = new Map(localProds.map(p => [p.sku, p.id]));
+              for (const prod of data.products || []) {
+                const localId = localProdMap.get(prod.sku);
+                if (localId) {
+                  this.productIdMap.set(localId, prod.id);
+                }
+              }
+            }
           }
         }
+
         console.log(`🗺️ ID maps: ${this.employeeIdMap.size} employees, ${this.registerIdMap.size} registers, ${this.productIdMap.size} products`);
       }
     } catch (e: any) {
