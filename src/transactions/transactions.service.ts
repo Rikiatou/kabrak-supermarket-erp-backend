@@ -33,7 +33,7 @@ export class TransactionsService {
       transactionNumber = `TXN-${dateStr}-${String(seq).padStart(4, '0')}`;
     }
 
-    // Transaction dans une transaction DB (atomicité)
+    // Transaction dans une transaction DB (atomicité) — timeout 30s pour mini PC
     const tenantId = getCurrentTenantId();
     const transaction = await this.prisma.$transaction(async (prisma) => {
       // 1. Créer la transaction
@@ -125,6 +125,9 @@ export class TransactionsService {
       }
 
       return tx;
+    }, {
+      timeout: 30000, // 30 secondes au lieu de 5 (mini PC peut être lent)
+      maxWait: 60000, // attendre jusqu'à 60s pour obtenir la connexion
     });
 
     return transaction;
