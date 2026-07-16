@@ -18,6 +18,7 @@ export class StockController {
     @Query('productId') productId?: string,
     @Query('type') type?: string,
     @Query('negativeOnly') negativeOnly?: string,
+    @Query('reason') reason?: string,
   ) {
     return this.stockService.findAllMovements(
       page ? parseInt(page) : 1,
@@ -25,6 +26,7 @@ export class StockController {
       productId,
       type,
       negativeOnly === 'true',
+      reason,
     );
   }
 

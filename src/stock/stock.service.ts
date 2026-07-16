@@ -37,6 +37,7 @@ export class StockService {
     productId?: string,
     type?: string,
     negativeOnly?: boolean,
+    reason?: string,
   ) {
     const skip = (page - 1) * limit;
     const where: any = {};
@@ -51,6 +52,16 @@ export class StockService {
 
     if (negativeOnly) {
       where.quantity = { lt: 0 };
+    }
+
+    if (reason) {
+      // Supporter plusieurs reasons séparées par virgule (ex: "gift_staff,gift_other")
+      const reasons = reason.split(',').map((r) => r.trim()).filter(Boolean);
+      if (reasons.length === 1) {
+        where.reason = reasons[0];
+      } else if (reasons.length > 1) {
+        where.reason = { in: reasons };
+      }
     }
 
     const [movements, total] = await Promise.all([
