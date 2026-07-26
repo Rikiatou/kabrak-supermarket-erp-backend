@@ -9,6 +9,8 @@ export class SyncService implements OnModuleInit {
   private syncEnabled: boolean;
   private isOnline: boolean = true;
   private syncInterval: any;
+  // FIX: Guard concurrence — empêche 2 cycles de sync de tourner en même temps
+  private isSyncing: boolean = false;
 
   // Cache: maps local employeeId → cloud employeeId (by employeeNumber)
   private employeeIdMap: Map<string, string> = new Map();
@@ -45,6 +47,12 @@ export class SyncService implements OnModuleInit {
 
   // Vérifier connexion internet + synchroniser
   async checkAndSync() {
+    // FIX: Empêcher deux cycles de sync simultanés (contention DB/réseau)
+    if (this.isSyncing) {
+      console.log('⏳ Sync déjà en cours, cycle ignoré');
+      return;
+    }
+
     const wasOnline = this.isOnline;
     this.isOnline = await this.checkInternetConnection();
 
@@ -53,10 +61,20 @@ export class SyncService implements OnModuleInit {
     }
 
     if (this.isOnline && this.syncEnabled) {
-      // Push local → cloud
-      await this.syncAll();
-      // Pull cloud → local (reverse sync)
-      await this.pullFromCloud();
+      this.isSyncing = true;
+      const startTime = Date.now();
+      try {
+        // Push local → cloud
+        await this.syncAll();
+        // Pull cloud → local (reverse sync)
+        await this.pullFromCloud();
+      } finally {
+        this.isSyncing = false;
+        const duration = Date.now() - startTime;
+        if (duration > 10000) {
+          console.warn(`⚠️ Sync a duré ${Math.round(duration / 1000)}s — surveiller les performances`);
+        }
+      }
     }
   }
 
@@ -73,235 +91,73 @@ export class SyncService implements OnModuleInit {
 
       const since = lastPull?.lastAttempt?.toISOString() || new Date(0).toISOString();
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      // FIX: Paginate products (the large table) to avoid loading tens of
+      // thousands of rows into memory at once on the mini-PC. Other entities
+      // are small and returned in full on the first page only.
+      const PAGE_SIZE = 500;
+      let offset = 0;
+      let applied = 0;
+      let page = 0;
+      let productsTotal: number | null = null;
+      let smallEntitiesApplied = false;
 
-      const response = await fetch(
-        `${this.cloudApiUrl}/cloud-sync/pull?since=${encodeURIComponent(since)}`,
-        {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+
+        const url = `${this.cloudApiUrl}/cloud-sync/pull?since=${encodeURIComponent(since)}`
+          + `&productsLimit=${PAGE_SIZE}&productsOffset=${offset}`;
+
+        const response = await fetch(url, {
           headers: { 'x-api-key': this.cloudApiKey },
           signal: controller.signal,
-        },
-      );
+        });
 
-      clearTimeout(timeout);
+        clearTimeout(timeout);
 
-      if (!response.ok) {
-        console.log('⬇️ Pull: cloud returned', response.status);
-        return;
-      }
+        if (!response.ok) {
+          console.log('⬇️ Pull: cloud returned', response.status);
+          return;
+        }
 
-      const data = await response.json();
-      console.log(`⬇️ Pull: ${data.counts.employees} employees, ${data.counts.products} products, ${data.counts.cashRegisters} registers, ${data.counts.customers} customers, ${data.counts.suppliers} suppliers, ${data.counts.schedules} schedules`);
+        const data = await response.json();
 
-      let applied = 0;
+        if (productsTotal === null && data.productsTotal != null) {
+          productsTotal = data.productsTotal;
+          console.log(`⬇️ Pull: ${productsTotal} products to fetch (paged ${PAGE_SIZE}/page)`);
+        }
 
-      // Apply employees
-      for (const emp of data.employees || []) {
-        try {
-          await this.prisma.employee.upsert({
-            where: { employeeNumber: emp.employeeNumber },
-            create: {
-              id: emp.id, employeeNumber: emp.employeeNumber,
-              firstName: emp.firstName, lastName: emp.lastName,
-              role: emp.role, department: emp.department,
-              phone: emp.phone, email: emp.email,
-              hireDate: emp.hireDate ? new Date(emp.hireDate) : new Date(),
-              status: emp.status, pin: emp.pin, licenseKey: emp.licenseKey,
-              tenantId: emp.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-            update: {
-              firstName: emp.firstName, lastName: emp.lastName,
-              role: emp.role, department: emp.department,
-              phone: emp.phone, email: emp.email,
-              status: emp.status, licenseKey: emp.licenseKey,
-              tenantId: emp.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-              // NOTE: pin is NOT updated from cloud — local PIN is authoritative
-            },
-          });
-          applied++;
-        } catch (e: any) {
-          console.log(`⬇️ Pull: skip employee ${emp.employeeNumber}: ${e.message}`);
+        // Small entities: apply only once (first page)
+        if (!smallEntitiesApplied) {
+          console.log(`⬇️ Pull: ${data.counts.employees} employees, ${data.counts.cashRegisters} registers, ${data.counts.customers} customers, ${data.counts.suppliers} suppliers, ${data.counts.schedules} schedules`);
+          applied += await this.applyEmployees(data.employees || []);
+          applied += await this.applyCashRegisters(data.cashRegisters || []);
+          applied += await this.applyCustomers(data.customers || []);
+          applied += await this.applySuppliers(data.suppliers || []);
+          applied += await this.applySchedules(data.schedules || []);
+          smallEntitiesApplied = true;
+        }
+
+        // Products: apply every page
+        const before = applied;
+        applied += await this.applyProducts(data.products || []);
+        page++;
+        console.log(`⬇️ Pull page ${page}: +${applied - before} products (offset ${offset})`);
+
+        if (!data.productsHasMore) break;
+        offset += PAGE_SIZE;
+
+        // Safety valve: never loop forever even if cloud misreports
+        if (productsTotal != null && offset >= productsTotal) break;
+        if (page > 200) {
+          console.warn('⬇️ Pull: exceeded 200 pages, aborting loop');
+          break;
         }
       }
 
-      // Apply products
-      for (const prod of data.products || []) {
-        try {
-          // Try to find existing product by id, sku, or barcode
-          const existing = await this.prisma.product.findFirst({
-            where: { OR: [{ id: prod.id }, { sku: prod.sku }, ...(prod.barcode ? [{ barcode: prod.barcode }] : [])] },
-            select: { id: true },
-          });
-
-          if (existing) {
-            // Update existing product (don't change barcode/sku to avoid conflicts)
-            await this.prisma.product.update({
-              where: { id: existing.id },
-              data: {
-                name: prod.name, description: prod.description,
-                category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
-                price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
-                wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
-                packBarcode: prod.packBarcode,
-                markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
-                markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
-                markdownExpiresAt: prod.markdownExpiresAt,
-                minStock: prod.minStock, maxStock: prod.maxStock,
-                unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
-                supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
-                tenantId: prod.tenantId || null,
-                syncStatus: 'synced', syncedAt: new Date(),
-              },
-            });
-          } else {
-            // Create new product
-            await this.prisma.product.create({
-              data: {
-                id: prod.id, sku: prod.sku, barcode: prod.barcode,
-                name: prod.name, description: prod.description,
-                category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
-                price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
-                wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
-                packBarcode: prod.packBarcode,
-                markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
-                markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
-                markdownExpiresAt: prod.markdownExpiresAt,
-                stock: prod.stock, minStock: prod.minStock, maxStock: prod.maxStock,
-                unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
-                supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
-                tenantId: prod.tenantId || null,
-                syncStatus: 'synced', syncedAt: new Date(),
-              },
-            });
-          }
-          applied++;
-        } catch (e: any) {
-          console.log(`⬇️ Pull: skip product ${prod.sku}: ${e.message}`);
-        }
-      }
-
-      // Apply cash registers
-      for (const reg of data.cashRegisters || []) {
-        try {
-          await this.prisma.cashRegister.upsert({
-            where: { code: reg.code },
-            create: {
-              id: reg.id, name: reg.name, code: reg.code, status: reg.status,
-              openingCash: reg.openingCash, currentCash: reg.currentCash,
-              location: reg.location, isActive: reg.isActive,
-              tenantId: reg.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-            update: {
-              name: reg.name, status: reg.status,
-              openingCash: reg.openingCash, currentCash: reg.currentCash,
-              location: reg.location, isActive: reg.isActive,
-              tenantId: reg.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-          });
-          applied++;
-        } catch (e: any) {
-          console.log(`⬇️ Pull: skip register ${reg.code}: ${e.message}`);
-        }
-      }
-
-      // Apply customers
-      for (const cust of data.customers || []) {
-        try {
-          await this.prisma.customer.upsert({
-            where: { customerNumber: cust.customerNumber },
-            create: {
-              id: cust.id, customerNumber: cust.customerNumber,
-              firstName: cust.firstName, lastName: cust.lastName,
-              phone: cust.phone, email: cust.email || null,
-              points: cust.points || 0, totalSpent: cust.totalSpent || 0,
-              tier: cust.tier || 'bronze', isActive: cust.isActive ?? true,
-              createdBy: cust.createdBy || null,
-              tenantId: cust.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-            update: {
-              firstName: cust.firstName, lastName: cust.lastName,
-              phone: cust.phone, email: cust.email || null,
-              points: cust.points || 0, totalSpent: cust.totalSpent || 0,
-              tier: cust.tier || 'bronze', isActive: cust.isActive ?? true,
-              tenantId: cust.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-          });
-          applied++;
-        } catch (e: any) {
-          console.log(`⬇️ Pull: skip customer ${cust.customerNumber}: ${e.message}`);
-        }
-      }
-
-      // Apply suppliers
-      for (const sup of data.suppliers || []) {
-        try {
-          await this.prisma.supplier.upsert({
-            where: { id: sup.id },
-            create: {
-              id: sup.id, name: sup.name, contact: sup.contact,
-              phone: sup.phone, email: sup.email || null,
-              address: sup.address || null,
-              paymentTerms: sup.paymentTerms || '30 jours',
-              rating: sup.rating || 0, isActive: sup.isActive ?? true,
-              licenseKey: sup.licenseKey || null,
-              tenantId: sup.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-            update: {
-              name: sup.name, contact: sup.contact,
-              phone: sup.phone, email: sup.email || null,
-              address: sup.address || null,
-              paymentTerms: sup.paymentTerms || '30 jours',
-              rating: sup.rating || 0, isActive: sup.isActive ?? true,
-              licenseKey: sup.licenseKey || null,
-              tenantId: sup.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-          });
-          applied++;
-        } catch (e: any) {
-          console.log(`⬇️ Pull: skip supplier ${sup.id}: ${e.message}`);
-        }
-      }
-
-      // Apply schedules
-      for (const sch of data.schedules || []) {
-        try {
-          await this.prisma.schedule.upsert({
-            where: { id: sch.id },
-            create: {
-              id: sch.id, employeeId: sch.employeeId, registerId: sch.registerId,
-              dayOfWeek: sch.dayOfWeek, startTime: sch.startTime,
-              endTime: sch.endTime, breakStart: sch.breakStart || null,
-              breakEnd: sch.breakEnd || null, isActive: sch.isActive,
-              notes: sch.notes || null,
-              tenantId: sch.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-            update: {
-              employeeId: sch.employeeId, registerId: sch.registerId,
-              dayOfWeek: sch.dayOfWeek, startTime: sch.startTime,
-              endTime: sch.endTime, breakStart: sch.breakStart || null,
-              breakEnd: sch.breakEnd || null, isActive: sch.isActive,
-              notes: sch.notes || null,
-              tenantId: sch.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
-          });
-          applied++;
-        } catch (e: any) {
-          console.log(`⬇️ Pull: skip schedule ${sch.id}: ${e.message}`);
-        }
-      }
-
-      // Log the pull
+      // Log the pull ONLY after the final page succeeds, so a crash mid-pull
+      // restarts from the same `since` timestamp on the next cycle.
       await this.prisma.syncLog.create({
         data: {
           entityType: 'reverse_sync',
@@ -313,10 +169,252 @@ export class SyncService implements OnModuleInit {
         },
       }).catch(() => {});
 
-      console.log(`⬇️ Pull complete: ${applied} entities applied`);
+      console.log(`⬇️ Pull complete: ${applied} entities applied across ${page} page(s)`);
     } catch (e: any) {
       console.log(`⬇️ Pull error: ${e.message}`);
     }
+  }
+
+  // --- Pull helpers (extracted from pullFromCloud for readability) ---
+
+  private async applyEmployees(employees: any[]): Promise<number> {
+    let applied = 0;
+    for (const emp of employees) {
+      try {
+        const tenantId = emp.tenantId || null;
+        const existing = await this.prisma.employee.findFirst({
+          where: { employeeNumber: emp.employeeNumber, tenantId },
+          select: { id: true },
+        });
+        if (existing) {
+          await this.prisma.employee.update({
+            where: { id: existing.id },
+            data: {
+              firstName: emp.firstName, lastName: emp.lastName,
+              role: emp.role, department: emp.department,
+              phone: emp.phone, email: emp.email,
+              status: emp.status, licenseKey: emp.licenseKey,
+              tenantId,
+              syncStatus: 'synced', syncedAt: new Date(),
+              // NOTE: pin is NOT updated from cloud — local PIN is authoritative
+            },
+          });
+        } else {
+          await this.prisma.employee.create({
+            data: {
+              id: emp.id, employeeNumber: emp.employeeNumber,
+              firstName: emp.firstName, lastName: emp.lastName,
+              role: emp.role, department: emp.department,
+              phone: emp.phone, email: emp.email,
+              hireDate: emp.hireDate ? new Date(emp.hireDate) : new Date(),
+              status: emp.status, pin: emp.pin, licenseKey: emp.licenseKey,
+              tenantId,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+        }
+        applied++;
+      } catch (e: any) {
+        console.log(`⬇️ Pull: skip employee ${emp.employeeNumber}: ${e.message}`);
+      }
+    }
+    return applied;
+  }
+
+  private async applyProducts(products: any[]): Promise<number> {
+    let applied = 0;
+    for (const prod of products) {
+      try {
+        // Try to find existing product by id, sku, or barcode
+        const existing = await this.prisma.product.findFirst({
+          where: { OR: [{ id: prod.id }, { sku: prod.sku }, ...(prod.barcode ? [{ barcode: prod.barcode }] : [])] },
+          select: { id: true },
+        });
+
+        if (existing) {
+          // Update existing product (don't change barcode/sku to avoid conflicts)
+          await this.prisma.product.update({
+            where: { id: existing.id },
+            data: {
+              name: prod.name, description: prod.description,
+              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+              packBarcode: prod.packBarcode,
+              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+              markdownExpiresAt: prod.markdownExpiresAt,
+              minStock: prod.minStock, maxStock: prod.maxStock,
+              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+              tenantId: prod.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+        } else {
+          // Create new product
+          await this.prisma.product.create({
+            data: {
+              id: prod.id, sku: prod.sku, barcode: prod.barcode,
+              name: prod.name, description: prod.description,
+              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+              packBarcode: prod.packBarcode,
+              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+              markdownExpiresAt: prod.markdownExpiresAt,
+              stock: prod.stock, minStock: prod.minStock, maxStock: prod.maxStock,
+              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+              tenantId: prod.tenantId || null,
+              syncStatus: 'synced', syncedAt: new Date(),
+            },
+          });
+        }
+        applied++;
+      } catch (e: any) {
+        console.log(`⬇️ Pull: skip product ${prod.sku}: ${e.message}`);
+      }
+    }
+    return applied;
+  }
+
+  private async applyCashRegisters(registers: any[]): Promise<number> {
+    let applied = 0;
+    for (const reg of registers) {
+      try {
+        const tenantId = reg.tenantId || null;
+        const existing = await this.prisma.cashRegister.findFirst({
+          where: { code: reg.code, tenantId },
+          select: { id: true },
+        });
+        const common = {
+          name: reg.name, status: reg.status,
+          openingCash: reg.openingCash, currentCash: reg.currentCash,
+          location: reg.location, isActive: reg.isActive,
+          tenantId,
+          syncStatus: 'synced', syncedAt: new Date(),
+        };
+        if (existing) {
+          await this.prisma.cashRegister.update({
+            where: { id: existing.id },
+            data: common,
+          });
+        } else {
+          await this.prisma.cashRegister.create({
+            data: { ...common, id: reg.id, code: reg.code },
+          });
+        }
+        applied++;
+      } catch (e: any) {
+        console.log(`⬇️ Pull: skip register ${reg.code}: ${e.message}`);
+      }
+    }
+    return applied;
+  }
+
+  private async applyCustomers(customers: any[]): Promise<number> {
+    let applied = 0;
+    for (const cust of customers) {
+      try {
+        const tenantId = cust.tenantId || null;
+        const existing = await this.prisma.customer.findFirst({
+          where: { customerNumber: cust.customerNumber, tenantId },
+          select: { id: true },
+        });
+        const common = {
+          firstName: cust.firstName, lastName: cust.lastName,
+          phone: cust.phone, email: cust.email || null,
+          points: cust.points || 0, totalSpent: cust.totalSpent || 0,
+          tier: cust.tier || 'bronze', isActive: cust.isActive ?? true,
+          tenantId,
+          syncStatus: 'synced', syncedAt: new Date(),
+        };
+        if (existing) {
+          await this.prisma.customer.update({
+            where: { id: existing.id },
+            data: common,
+          });
+        } else {
+          await this.prisma.customer.create({
+            data: { ...common, id: cust.id, customerNumber: cust.customerNumber, createdBy: cust.createdBy || null },
+          });
+        }
+        applied++;
+      } catch (e: any) {
+        console.log(`⬇️ Pull: skip customer ${cust.customerNumber}: ${e.message}`);
+      }
+    }
+    return applied;
+  }
+
+  private async applySuppliers(suppliers: any[]): Promise<number> {
+    let applied = 0;
+    for (const sup of suppliers) {
+      try {
+        await this.prisma.supplier.upsert({
+          where: { id: sup.id },
+          create: {
+            id: sup.id, name: sup.name, contact: sup.contact,
+            phone: sup.phone, email: sup.email || null,
+            address: sup.address || null,
+            paymentTerms: sup.paymentTerms || '30 jours',
+            rating: sup.rating || 0, isActive: sup.isActive ?? true,
+            licenseKey: sup.licenseKey || null,
+            tenantId: sup.tenantId || null,
+            syncStatus: 'synced', syncedAt: new Date(),
+          },
+          update: {
+            name: sup.name, contact: sup.contact,
+            phone: sup.phone, email: sup.email || null,
+            address: sup.address || null,
+            paymentTerms: sup.paymentTerms || '30 jours',
+            rating: sup.rating || 0, isActive: sup.isActive ?? true,
+            licenseKey: sup.licenseKey || null,
+            tenantId: sup.tenantId || null,
+            syncStatus: 'synced', syncedAt: new Date(),
+          },
+        });
+        applied++;
+      } catch (e: any) {
+        console.log(`⬇️ Pull: skip supplier ${sup.id}: ${e.message}`);
+      }
+    }
+    return applied;
+  }
+
+  private async applySchedules(schedules: any[]): Promise<number> {
+    let applied = 0;
+    for (const sch of schedules) {
+      try {
+        await this.prisma.schedule.upsert({
+          where: { id: sch.id },
+          create: {
+            id: sch.id, employeeId: sch.employeeId, registerId: sch.registerId,
+            dayOfWeek: sch.dayOfWeek, startTime: sch.startTime,
+            endTime: sch.endTime, breakStart: sch.breakStart || null,
+            breakEnd: sch.breakEnd || null, isActive: sch.isActive,
+            notes: sch.notes || null,
+            tenantId: sch.tenantId || null,
+            syncStatus: 'synced', syncedAt: new Date(),
+          },
+          update: {
+            employeeId: sch.employeeId, registerId: sch.registerId,
+            dayOfWeek: sch.dayOfWeek, startTime: sch.startTime,
+            endTime: sch.endTime, breakStart: sch.breakStart || null,
+            breakEnd: sch.breakEnd || null, isActive: sch.isActive,
+            notes: sch.notes || null,
+            tenantId: sch.tenantId || null,
+            syncStatus: 'synced', syncedAt: new Date(),
+          },
+        });
+        applied++;
+      } catch (e: any) {
+        console.log(`⬇️ Pull: skip schedule ${sch.id}: ${e.message}`);
+      }
+    }
+    return applied;
   }
 
   // Vérifier connexion internet

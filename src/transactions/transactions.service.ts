@@ -25,7 +25,7 @@ export class TransactionsService {
 
     // Vérifier que le numéro n'existe pas déjà (retry jusqu'à 10 fois)
     for (let i = 0; i < 10; i++) {
-      const exists = await this.prisma.transaction.findUnique({
+      const exists = await this.prisma.transaction.findFirst({
         where: { transactionNumber },
       });
       if (!exists) break;

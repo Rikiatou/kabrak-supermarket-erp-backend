@@ -145,7 +145,7 @@ export class ProductsService {
 
     // Recherche par barcode exact (scan caisse)
     if (barcode) {
-      const product = await this.prisma.product.findUnique({
+      const product = await this.prisma.product.findFirst({
         where: { barcode },
         include: { supplier: true },
       });
@@ -157,7 +157,7 @@ export class ProductsService {
 
     // Recherche par SKU exact
     if (sku) {
-      const product = await this.prisma.product.findUnique({
+      const product = await this.prisma.product.findFirst({
         where: { sku },
         include: { supplier: true },
       });
@@ -239,7 +239,7 @@ export class ProductsService {
   // Trouver par barcode (pour caisse) — cherche aussi par packBarcode
   async findByBarcode(barcode: string) {
     // D'abord chercher par barcode unité
-    let product = await this.prisma.product.findUnique({
+    let product = await this.prisma.product.findFirst({
       where: { barcode },
       include: { supplier: true },
     });

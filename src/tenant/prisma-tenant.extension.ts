@@ -36,7 +36,7 @@ const TENANT_MODELS = [
 export function applyTenantFilter(prisma: PrismaClient) {
   return prisma.$extends({
     query: {
-      $allOperations: ({ model, operation, args, query }) => {
+      $allOperations: async ({ model, operation, args, query }) => {
         // Only apply to tenant models
         if (!model || !TENANT_MODELS.includes(model)) {
           return query(args);
@@ -59,13 +59,15 @@ export function applyTenantFilter(prisma: PrismaClient) {
           operation === 'groupBy'
         ) {
           if (operation === 'findUnique') {
-            // findUnique uses where: { id: ... } - convert to findFirst to add tenantId
-            // Actually, let's add tenantId to the where if it's a compound unique
-            // For simplicity, we add AND condition
-            args.where = { ...args.where, tenantId };
-          } else {
-            args.where = { ...args.where, tenantId };
+            // findUnique n'accepte que les champs uniques dans where.
+            // Ajouter tenantId casserait l'appel. On convertit en findFirst
+            // pour pouvoir filtrer par tenantId en plus de la clé unique.
+            return (prisma as any)[model].findFirst({
+              ...args,
+              where: { ...args.where, tenantId },
+            });
           }
+          args.where = { ...args.where, tenantId };
         }
 
         // Create operations: inject tenantId into data
@@ -81,20 +83,51 @@ export function applyTenantFilter(prisma: PrismaClient) {
           }
         }
 
-        // Upsert: inject tenantId into create and where
+        // Upsert: inject tenantId into create; for where, convert to findFirst+update/create
+        // to avoid Prisma rejecting non-unique fields in upsert's where clause.
         if (operation === 'upsert') {
-          args.where = { ...args.where, tenantId };
+          // upsert's where only accepts unique fields. Adding tenantId breaks it.
+          // Strategy: do a findFirst by the original where + tenantId, then update or create.
+          const existing = await (prisma as any)[model!].findFirst({
+            where: { ...args.where, tenantId },
+            select: { id: true },
+          });
           args.create = { ...args.create, tenantId };
           if (args.update) {
-            // Don't allow changing tenantId on update
             const { tenantId: _, ...updateData } = args.update as any;
             args.update = updateData;
           }
+          if (existing) {
+            return (prisma as any)[model!].update({
+              where: { id: existing.id },
+              data: args.update,
+              ...((args as any).include ? { include: (args as any).include } : {}),
+            });
+          }
+          return (prisma as any)[model!].create({
+            data: args.create,
+            ...((args as any).include ? { include: (args as any).include } : {}),
+          });
         }
 
-        // Update/delete: add tenantId to where to prevent cross-tenant
-        if (operation === 'update' || operation === 'updateMany' || operation === 'delete' || operation === 'deleteMany') {
+        // Update/delete: prevent cross-tenant access
+        if (operation === 'updateMany' || operation === 'deleteMany') {
+          // updateMany/deleteMany accept non-unique where → safe to add tenantId
           args.where = { ...args.where, tenantId };
+        } else if (operation === 'update' || operation === 'delete') {
+          // update/delete only accept unique fields in where → adding tenantId breaks.
+          // Verify the record belongs to the tenant first via findFirst.
+          const existing = await (prisma as any)[model!].findFirst({
+            where: { ...args.where, tenantId },
+            select: { id: true },
+          });
+          if (!existing) {
+            // Not found or cross-tenant → return null (Prisma returns null for not-found on update/delete with throwOnNotFound=false)
+            // For update, Prisma throws by default; returning null mimics "not found"
+            return null as any;
+          }
+          // Now safe to update/delete by id
+          args.where = { id: existing.id };
         }
 
         return query(args);

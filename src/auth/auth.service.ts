@@ -18,7 +18,7 @@ export class AuthService {
 
   // Login par numéro employé + PIN
   async login(loginDto: LoginDto): Promise<{ user: AuthUser; token: string }> {
-    const employee = await this.prisma.employee.findUnique({
+    const employee = await this.prisma.employee.findFirst({
       where: { employeeNumber: loginDto.employeeNumber },
     });
 

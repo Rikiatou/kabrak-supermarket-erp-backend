@@ -67,7 +67,7 @@ export class CustomersService {
     const customerNumber = `KAB-${String(count + 1).padStart(6, '0')}`;
 
     // Vérifier si le téléphone existe déjà
-    const existing = await this.prisma.customer.findUnique({
+    const existing = await this.prisma.customer.findFirst({
       where: { phone: dto.phone },
     });
     if (existing) {

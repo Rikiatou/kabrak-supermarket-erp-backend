@@ -15,8 +15,8 @@ datasource db {
 // ========================================
 model Product {
   id          String   @id @default(cuid())
-  sku         String   @unique
-  barcode     String   @unique
+  sku         String
+  barcode     String
   name        String
   description String?
   category    String
@@ -86,6 +86,8 @@ model Product {
   @@index([markdownPrice])              // Produits en markdown actif
   @@index([tenantId])                   // Multi-tenant
 
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
   @@map("products")
 }
 
@@ -126,7 +128,7 @@ model Supplier {
 // ========================================
 model Transaction {
   id            String   @id @default(cuid())
-  transactionNumber String @unique // Format: TXN-20260618-0001
+  transactionNumber String // Format: TXN-20260618-0001
   date          DateTime @default(now())
   
   // Caisse & Employé
@@ -182,6 +184,7 @@ model Transaction {
   @@index([tenantId])
   @@index([invoiceId])
 
+  @@unique([tenantId, transactionNumber])
   @@map("transactions")
 }
 
@@ -211,7 +214,7 @@ model TransactionItem {
 model CashRegister {
   id          String   @id @default(cuid())
   name        String   // "Caisse 1", "Caisse 2"
-  code        String   @unique // "REG001", "REG002"
+  code        String   // "REG001", "REG002"
   status      String   @default("closed") // "open", "closed"
   
   // Fonds de caisse
@@ -241,6 +244,7 @@ model CashRegister {
   @@index([isActive])
   @@index([tenantId])
 
+  @@unique([tenantId, code])
   @@map("cash_registers")
 }
 
@@ -289,7 +293,7 @@ model Shift {
 // ========================================
 model Employee {
   id            String   @id @default(cuid())
-  employeeNumber String  @unique
+  employeeNumber String
   firstName     String
   lastName      String
   role          String   // "manager", "cashier", "stockist", "supervisor"
@@ -325,6 +329,7 @@ model Employee {
   @@index([licenseKey])
   @@index([tenantId])
 
+  @@unique([tenantId, employeeNumber])
   @@map("employees")
 }
 
@@ -371,7 +376,7 @@ model StockMovement {
 // ========================================
 model PurchaseOrder {
   id           String   @id @default(cuid())
-  orderNumber  String   @unique
+  orderNumber  String
   
   supplierId   String
   supplier     Supplier @relation(fields: [supplierId], references: [id])
@@ -403,6 +408,7 @@ model PurchaseOrder {
   @@index([orderNumber])
   @@index([tenantId])
   
+  @@unique([tenantId, orderNumber])
   @@map("purchase_orders")
 }
 
@@ -431,11 +437,11 @@ model PurchaseOrderItem {
 // ========================================
 model Customer {
   id          String   @id @default(cuid())
-  customerNumber String @unique
+  customerNumber String
   
   firstName   String
   lastName    String
-  phone       String   @unique
+  phone       String
   email       String?
   
   // Fidélité
@@ -467,6 +473,8 @@ model Customer {
   @@index([syncStatus])
   @@index([tenantId])
   
+  @@unique([tenantId, customerNumber])
+  @@unique([tenantId, phone])
   @@map("customers")
 }
 
@@ -587,7 +595,7 @@ model Revenue {
 // ========================================
 model Invoice {
   id          String   @id @default(cuid())
-  number      String   @unique // "FAC-2026-0001"
+  number      String   // "FAC-2026-0001"
   
   // Client (pas forcément un Customer fidélité)
   clientName  String
@@ -643,6 +651,7 @@ model Invoice {
   @@index([createdBy])
   @@index([tenantId])
   
+  @@unique([tenantId, number])
   @@map("invoices")
 }
 
@@ -887,7 +896,7 @@ model Store {
   license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
 
   name        String
-  code        String   @unique
+  code        String
   address     String?
   phone       String?
   city        String?
@@ -903,6 +912,7 @@ model Store {
   @@index([isActive])
   @@index([syncStatus])
 
+  @@unique([licenseId, code])
   @@map("stores")
 }
 
