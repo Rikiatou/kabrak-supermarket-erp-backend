@@ -12,9 +12,13 @@ import { getTenantNamespace } from './tenant.context';
  * Runs AFTER the AuthGuard, so req.user is available.
  *
  * Priority:
- *   1. X-Tenant-Id header (explicit tenant routing)
- *   2. JWT user.tenantId
+ *   1. JWT user.tenantId (authenticated — most secure)
+ *   2. X-Tenant-Id header (for pre-auth calls like listCashiers on login page)
  *   3. null (single-tenant mode, cloud-sync, super-admin)
+ *
+ * SECURITY: When authenticated, the JWT tenantId ALWAYS wins over the header.
+ * This prevents a user from accessing another tenant's data by sending a
+ * fake X-Tenant-Id header.
  */
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
@@ -23,15 +27,17 @@ export class TenantInterceptor implements NestInterceptor {
 
     let tenantId: string | null = null;
 
-    // Priority 1: explicit header
-    const headerTenant = request.headers['x-tenant-id'] as string;
-    if (headerTenant) {
-      tenantId = headerTenant;
+    // Priority 1: from JWT user (authenticated — secure)
+    if (request.user?.tenantId) {
+      tenantId = request.user.tenantId;
     }
 
-    // Priority 2: from JWT user (set by AuthGuard)
-    if (!tenantId && request.user?.tenantId) {
-      tenantId = request.user.tenantId;
+    // Priority 2: explicit header (only when NOT authenticated — e.g. login page listCashiers)
+    if (!tenantId) {
+      const headerTenant = request.headers['x-tenant-id'] as string;
+      if (headerTenant) {
+        tenantId = headerTenant;
+      }
     }
 
     // Set tenant in CLS context
