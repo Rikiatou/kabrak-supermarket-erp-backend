@@ -25,14 +25,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const self = this;
     this._proxy = new Proxy(self, {
       get(target: any, prop: string | symbol, receiver: any) {
-        // If property exists on PrismaService itself (methods, _extended, etc.)
-        if (prop in target) {
-          const val = Reflect.get(target, prop, receiver);
-          return val;
-        }
-        // If extended client is ready, use it (has tenant filtering)
+        // Priority 1: if extended client is ready and has this property, use it
+        // (this ensures tenant filtering is applied to all Prisma model access)
         if (target._extended && prop in target._extended) {
           return target._extended[prop];
+        }
+        // Priority 2: if property exists on PrismaService itself (methods, etc.)
+        if (prop in target) {
+          return Reflect.get(target, prop, receiver);
         }
         // Fall back to base PrismaClient
         return Reflect.get(target, prop, receiver);
