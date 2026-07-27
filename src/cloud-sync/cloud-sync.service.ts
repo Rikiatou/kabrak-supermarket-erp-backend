@@ -547,9 +547,12 @@ export class CloudSyncService {
   // Products are paginated (productsLimit/productsOffset) to avoid loading
   // tens of thousands of rows into memory at once on the mini-PC.
   // Other entities are returned in full (small volumes).
-  async pullChanges(since: Date, productsLimit?: number, productsOffset: number = 0) {
+  async pullChanges(since: Date, productsLimit?: number, productsOffset: number = 0, tenantId?: string) {
+    // Filtre tenant: si un tenantId est fourni, on ne renvoie QUE ses données
+    // (multi-tenant: chaque mini-PC ne doit recevoir que les données de son magasin)
+    const tenantWhere = tenantId ? { tenantId } : {};
     const productArgs: any = {
-      where: { updatedAt: { gt: since } },
+      where: { updatedAt: { gt: since }, ...tenantWhere },
       select: {
         id: true, sku: true, barcode: true, name: true, description: true,
         category: true, subCategory: true, brand: true,
@@ -578,7 +581,7 @@ export class CloudSyncService {
       productsTotal,
     ] = await Promise.all([
       this.prisma.employee.findMany({
-        where: { updatedAt: { gt: since } },
+        where: { updatedAt: { gt: since }, ...tenantWhere },
         select: {
           id: true, employeeNumber: true, firstName: true, lastName: true,
           role: true, department: true, phone: true, email: true,
@@ -588,7 +591,7 @@ export class CloudSyncService {
       }).catch(() => []),
       this.prisma.product.findMany(productArgs).catch(() => []),
       this.prisma.cashRegister.findMany({
-        where: { updatedAt: { gt: since } },
+        where: { updatedAt: { gt: since }, ...tenantWhere },
         select: {
           id: true, name: true, code: true, status: true,
           openingCash: true, currentCash: true, location: true, isActive: true,
@@ -596,7 +599,7 @@ export class CloudSyncService {
         },
       }).catch(() => []),
       this.prisma.customer.findMany({
-        where: { updatedAt: { gt: since } },
+        where: { updatedAt: { gt: since }, ...tenantWhere },
         select: {
           id: true, customerNumber: true, firstName: true, lastName: true,
           phone: true, email: true, points: true, totalSpent: true,
@@ -605,7 +608,7 @@ export class CloudSyncService {
         },
       }).catch(() => []),
       this.prisma.supplier.findMany({
-        where: { updatedAt: { gt: since } },
+        where: { updatedAt: { gt: since }, ...tenantWhere },
         select: {
           id: true, name: true, contact: true, phone: true, email: true,
           address: true, paymentTerms: true, rating: true, isActive: true,
@@ -613,7 +616,7 @@ export class CloudSyncService {
         },
       }).catch(() => []),
       this.prisma.schedule.findMany({
-        where: { updatedAt: { gt: since } },
+        where: { updatedAt: { gt: since }, ...tenantWhere },
         select: {
           id: true, employeeId: true, registerId: true, dayOfWeek: true,
           startTime: true, endTime: true, breakStart: true, breakEnd: true,
@@ -623,7 +626,7 @@ export class CloudSyncService {
       }).catch(() => []),
       // Only count when paginating (cheap when limit is set); else undefined
       productsLimit !== undefined
-        ? this.prisma.product.count({ where: { updatedAt: { gt: since } } }).catch(() => 0)
+        ? this.prisma.product.count({ where: { updatedAt: { gt: since }, ...tenantWhere } }).catch(() => 0)
         : Promise.resolve(undefined),
     ]);
 

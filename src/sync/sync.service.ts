@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service';
 export class SyncService implements OnModuleInit {
   private cloudApiUrl: string;
   private cloudApiKey: string;
+  private syncTenantId: string;
   private syncEnabled: boolean;
   private isOnline: boolean = true;
   private syncInterval: any;
@@ -25,6 +26,7 @@ export class SyncService implements OnModuleInit {
   ) {
     this.cloudApiUrl = this.configService.get<string>('CLOUD_API_URL', '');
     this.cloudApiKey = this.configService.get<string>('CLOUD_API_KEY', '');
+    this.syncTenantId = this.configService.get<string>('SYNC_TENANT_ID', '');
     this.syncEnabled = this.configService.get<string>('SYNC_ENABLED') === 'true';
   }
 
@@ -107,7 +109,8 @@ export class SyncService implements OnModuleInit {
         const timeout = setTimeout(() => controller.abort(), 60000);
 
         const url = `${this.cloudApiUrl}/cloud-sync/pull?since=${encodeURIComponent(since)}`
-          + `&productsLimit=${PAGE_SIZE}&productsOffset=${offset}`;
+          + `&productsLimit=${PAGE_SIZE}&productsOffset=${offset}`
+          + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : '');
 
         const response = await fetch(url, {
           headers: { 'x-api-key': this.cloudApiKey },
@@ -610,7 +613,8 @@ export class SyncService implements OnModuleInit {
 
     try {
       // Fetch all cloud entities in one request
-      const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`, {
+      const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`
+        + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : ''), {
         headers: { 'x-api-key': this.cloudApiKey },
       });
       if (empRes.ok) {

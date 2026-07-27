@@ -144,12 +144,13 @@ export class CloudSyncController {
     @Query('since') since: string,
     @Query('productsLimit') productsLimit: string,
     @Query('productsOffset') productsOffset: string,
+    @Query('tenantId') tenantId: string,
     @Headers() headers: Record<string, string>,
   ) {
     this.verifyApiKey(headers);
     const sinceDate = since ? new Date(since) : new Date(0);
     const limit = productsLimit ? Math.min(Math.max(parseInt(productsLimit, 10) || 500, 1), 1000) : undefined;
     const offset = productsOffset ? Math.max(parseInt(productsOffset, 10) || 0, 0) : 0;
-    return this.cloudSyncService.pullChanges(sinceDate, limit, offset);
+    return this.cloudSyncService.pullChanges(sinceDate, limit, offset, tenantId || undefined);
   }
 }
