@@ -614,21 +614,27 @@ export class SyncService implements OnModuleInit {
   // Sync transactions vers cloud
   // Build ID mapping caches by fetching cloud employees and registers
   // This maps local IDs → cloud IDs using business keys (employeeNumber, code, sku)
-  // OPTIMIZED: uses batch queries instead of 19000+ individual findFirst
+  // OPTIMIZED: No longer downloads 10k+ products from cloud.
+  // Products use the SAME id on both sides (upsertProduct creates with local id),
+  // so productIdMap is unnecessary — the fallback || item.productId in syncTransactions
+  // already gives the correct cloud id.
+  // We only fetch employees + registers (small tables, ~11 + ~12 rows) for ID mapping,
+  // since those can have different IDs if created independently on cloud first.
   private async buildIdMaps(): Promise<void> {
     if (!this.cloudApiUrl || !this.cloudApiKey) return;
 
     try {
-      // FIX: Use cached cloud data if fresh (within TTL) to avoid downloading
-      // 10k+ products from Neon every 5 min, which exhausted the data transfer quota.
+      // FIX: Use cached cloud data if fresh (within TTL) to avoid redundant requests
       const now = Date.now();
       let data: any = null;
 
       if (this.cloudDataCache && (now - this.cloudDataCacheAt) < this.CLOUD_CACHE_TTL) {
         data = this.cloudDataCache;
       } else {
-        // Fetch all cloud entities in one request (only when cache is stale)
+        // Only fetch employees + registers (small payloads, no products)
+        // Use productsLimit=0 to skip the products table entirely
         const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`
+          + `&productsLimit=0`
           + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : ''), {
           headers: { 'x-api-key': this.cloudApiKey },
         });
@@ -640,7 +646,6 @@ export class SyncService implements OnModuleInit {
       }
 
       if (data) {
-
         // Batch: fetch all local employees in ONE query
         const cloudEmpNums = (data.employees || []).map((e: any) => e.employeeNumber).filter(Boolean);
         if (cloudEmpNums.length > 0) {
@@ -673,31 +678,12 @@ export class SyncService implements OnModuleInit {
           }
         }
 
-        // Batch: fetch all local products in ONE query
-        // Only build product map if there are pending transactions (saves resources)
-        const pendingTxCount = await this.prisma.transaction.count({ where: { syncStatus: 'pending' } }).catch(() => 0);
-        if (pendingTxCount > 0) {
-          const cloudSkus = (data.products || []).map((p: any) => p.sku).filter(Boolean);
-          if (cloudSkus.length > 0) {
-            // Fetch in chunks of 1000 to avoid memory issues
-            for (let i = 0; i < cloudSkus.length; i += 1000) {
-              const chunk = cloudSkus.slice(i, i + 1000);
-              const localProds = await this.prisma.product.findMany({
-                where: { sku: { in: chunk } },
-                select: { id: true, sku: true },
-              });
-              const localProdMap = new Map(localProds.map(p => [p.sku, p.id]));
-              for (const prod of data.products || []) {
-                const localId = localProdMap.get(prod.sku);
-                if (localId) {
-                  this.productIdMap.set(localId, prod.id);
-                }
-              }
-            }
-          }
-        }
+        // NOTE: No product map is built. Products share the same id on both sides
+        // (upsertProduct creates with the local id), so productIdMap is unnecessary.
+        // syncTransactions uses `this.productIdMap.get(item.productId) || item.productId`
+        // and the fallback always returns the correct id.
 
-        console.log(`🗺️ ID maps: ${this.employeeIdMap.size} employees, ${this.registerIdMap.size} registers, ${this.productIdMap.size} products`);
+        console.log(`🗺️ ID maps: ${this.employeeIdMap.size} employees, ${this.registerIdMap.size} registers (products: same-id, no map needed)`);
       }
     } catch (e: any) {
       console.log(`🗺️ Build ID maps error: ${e.message}`);

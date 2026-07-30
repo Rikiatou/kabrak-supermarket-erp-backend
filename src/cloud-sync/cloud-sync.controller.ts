@@ -149,7 +149,9 @@ export class CloudSyncController {
   ) {
     this.verifyApiKey(headers);
     const sinceDate = since ? new Date(since) : new Date(0);
-    const limit = productsLimit ? Math.min(Math.max(parseInt(productsLimit, 10) || 500, 1), 1000) : undefined;
+    // productsLimit=0 means "skip products entirely" (used by buildIdMaps)
+    const parsedLimit = productsLimit !== undefined ? parseInt(productsLimit, 10) : undefined;
+    const limit = parsedLimit === 0 ? 0 : (parsedLimit ? Math.min(Math.max(parsedLimit, 1), 1000) : undefined);
     const offset = productsOffset ? Math.max(parseInt(productsOffset, 10) || 0, 0) : 0;
     return this.cloudSyncService.pullChanges(sinceDate, limit, offset, tenantId || undefined);
   }
