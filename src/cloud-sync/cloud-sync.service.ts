@@ -628,7 +628,6 @@ export class CloudSyncService {
       productsLimit !== undefined
         ? this.prisma.product.count({ where: { updatedAt: { gt: since }, ...tenantWhere } }).catch(() => 0)
         : Promise.resolve(undefined),
-        : Promise.resolve(undefined),
     ]);
 
     const productsHasMore = productsLimit !== undefined

@@ -20,6 +20,12 @@ export class SyncService implements OnModuleInit {
   // Cache: maps local productId → cloud productId (by sku)
   private productIdMap: Map<string, string> = new Map();
 
+  // FIX: Cache cloud pull data to avoid downloading 10k+ products every 5 min
+  // (was exhausting Neon free-tier data transfer quota)
+  private cloudDataCache: any = null;
+  private cloudDataCacheAt: number = 0;
+  private readonly CLOUD_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -484,6 +490,7 @@ export class SyncService implements OnModuleInit {
   // Synchroniser tout
   async syncAll() {
     // Clear ID maps at start of each cycle (cloud IDs may change)
+    // FIX: Only clear maps — the cloud data is cached in buildIdMaps (30 min TTL)
     this.employeeIdMap.clear();
     this.registerIdMap.clear();
     this.productIdMap.clear();
@@ -612,13 +619,27 @@ export class SyncService implements OnModuleInit {
     if (!this.cloudApiUrl || !this.cloudApiKey) return;
 
     try {
-      // Fetch all cloud entities in one request
-      const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`
-        + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : ''), {
-        headers: { 'x-api-key': this.cloudApiKey },
-      });
-      if (empRes.ok) {
-        const data = await empRes.json();
+      // FIX: Use cached cloud data if fresh (within TTL) to avoid downloading
+      // 10k+ products from Neon every 5 min, which exhausted the data transfer quota.
+      const now = Date.now();
+      let data: any = null;
+
+      if (this.cloudDataCache && (now - this.cloudDataCacheAt) < this.CLOUD_CACHE_TTL) {
+        data = this.cloudDataCache;
+      } else {
+        // Fetch all cloud entities in one request (only when cache is stale)
+        const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`
+          + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : ''), {
+          headers: { 'x-api-key': this.cloudApiKey },
+        });
+        if (empRes.ok) {
+          data = await empRes.json();
+          this.cloudDataCache = data;
+          this.cloudDataCacheAt = now;
+        }
+      }
+
+      if (data) {
 
         // Batch: fetch all local employees in ONE query
         const cloudEmpNums = (data.employees || []).map((e: any) => e.employeeNumber).filter(Boolean);

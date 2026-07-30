@@ -103,10 +103,10 @@ export class AiService {
         recommendations.push({
           type: 'stockout',
           priority: 'high',
-          title: `Rupture imminente: ${f.name}`,
-          message: `Le stock de ${f.name} sera épuisé dans ${f.daysUntilOut} jour(s). Commander ${f.recommendedOrder} ${f.unit} recommandé.`,
+          title: `Stockout alert: ${f.name}`,
+          message: `${f.name} will run out in ${f.daysUntilOut} day(s). Order ${f.recommendedOrder} ${f.unit} recommended.`,
           productId: f.id,
-          action: `Commander ${f.recommendedOrder} ${f.unit}`,
+          action: `Order ${f.recommendedOrder} ${f.unit}`,
         });
       });
 
@@ -118,10 +118,10 @@ export class AiService {
         recommendations.push({
           type: 'overstock',
           priority: 'low',
-          title: `Surstock détecté: ${f.name}`,
-          message: `${f.name} a un stock pour ${f.daysUntilOut} jours. Considérer une promotion pour accélérer les ventes.`,
+          title: `Overstock detected: ${f.name}`,
+          message: `${f.name} has ${f.daysUntilOut} days of stock. Consider a promotion to accelerate sales.`,
           productId: f.id,
-          action: 'Lancer une promotion',
+          action: 'Launch promotion',
         });
       });
 
@@ -143,10 +143,10 @@ export class AiService {
       recommendations.push({
         type: 'expiry',
         priority: daysLeft <= 7 ? 'high' : 'medium',
-        title: `Expiration proche: ${p.name}`,
-        message: `${p.name} expire dans ${daysLeft} jour(s). Stock: ${p.stock}. Considérer une remise.`,
+        title: `Expiring soon: ${p.name}`,
+        message: `${p.name} expires in ${daysLeft} day(s). Stock: ${p.stock}. Consider a markdown.`,
         productId: p.id,
-        action: 'Appliquer une remise',
+        action: 'Apply markdown',
       });
     });
 
@@ -170,10 +170,10 @@ export class AiService {
       recommendations.push({
         type: 'profit',
         priority: 'low',
-        title: `Top marge: ${p.name}`,
-        message: `${p.name} a une marge de ${p.marginRate.toFixed(1)}% (${p.margin} FCFA/unité). Mettre en avant.`,
+        title: `Top margin: ${p.name}`,
+        message: `${p.name} has a ${p.marginRate.toFixed(1)}% margin (${p.margin} FCFA/unit). Feature this product.`,
         productId: p.id,
-        action: 'Mettre en avant',
+        action: 'Feature product',
       });
     });
 
