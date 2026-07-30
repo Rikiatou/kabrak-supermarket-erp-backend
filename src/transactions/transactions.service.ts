@@ -11,20 +11,22 @@ export class TransactionsService {
   // Enregistrement local immédiat + sync plus tard
   async create(createTransactionDto: CreateTransactionDto) {
     // Générer numéro de transaction unique (avec retry)
+    // FIX: Compter par PRÉFIXE de numéro (TXN-YYYYMMDD-) au lieu de "depuis minuit local".
+    // L'ancienne logique utilisait dateStr en UTC mais comptait depuis minuit LOCAL,
+    // ce qui après minuit (UTC+1) générait TXN-<hier>-0001 → collision avec la
+    // contrainte unique [tenantId, transactionNumber] (194 ventes existantes ce jour-là).
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const count = await this.prisma.transaction.count({
       where: {
-        date: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
-        },
+        transactionNumber: { startsWith: `TXN-${dateStr}-` },
       },
     });
     let seq = count + 1;
     let transactionNumber = `TXN-${dateStr}-${String(seq).padStart(4, '0')}`;
 
-    // Vérifier que le numéro n'existe pas déjà (retry jusqu'à 10 fois)
-    for (let i = 0; i < 10; i++) {
+    // Vérifier que le numéro n'existe pas déjà (retry jusqu'à 100 fois pour couvrir les trous)
+    for (let i = 0; i < 100; i++) {
       const exists = await this.prisma.transaction.findFirst({
         where: { transactionNumber },
       });
