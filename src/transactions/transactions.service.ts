@@ -11,12 +11,11 @@ export class TransactionsService {
   // Enregistrement local immédiat + sync plus tard
   async create(createTransactionDto: CreateTransactionDto) {
     // Générer numéro de transaction unique (avec retry)
-    // FIX: Compter par PRÉFIXE de numéro (TXN-YYYYMMDD-) au lieu de "depuis minuit local".
-    // L'ancienne logique utilisait dateStr en UTC mais comptait depuis minuit LOCAL,
-    // ce qui après minuit (UTC+1) générait TXN-<hier>-0001 → collision avec la
-    // contrainte unique [tenantId, transactionNumber] (194 ventes existantes ce jour-là).
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    // FIX: Utiliser la date en heure LOCALE (pas UTC) pour le numéro de transaction.
+    // Une vente à 00:28 local (31 juillet) doit générer TXN-20260731-0001, pas TXN-20260730-...
+    // toISOString() retourne UTC → décalage d'1h après minuit local (Cameroun UTC+1).
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const count = await this.prisma.transaction.count({
       where: {
         transactionNumber: { startsWith: `TXN-${dateStr}-` },
@@ -152,13 +151,15 @@ export class TransactionsService {
 
     if (startDate || endDate) {
       where.date = {};
+      // FIX: Interpréter les dates en heure LOCALE (pas UTC).
+      // new Date("2026-07-31") = minuit UTC, mais on veut minuit local.
+      // Ajouter "T00:00:00" (sans Z) force l'interprétation en heure locale du serveur,
+      // pour que les ventes après minuit local s'affichent sous le bon jour.
       if (startDate) {
-        where.date.gte = new Date(startDate);
+        where.date.gte = new Date(`${startDate}T00:00:00`);
       }
       if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        where.date.lte = end;
+        where.date.lte = new Date(`${endDate}T23:59:59.999`);
       }
     }
 
