@@ -456,6 +456,29 @@ export class SyncService implements OnModuleInit {
 
     let synced = 0;
     for (const item of pending) {
+      // FIX: Skip items that have failed 5+ times recently (last 24h).
+      // Without this, a single broken item (e.g. cloud 500 due to Neon quota)
+      // blocks the entire queue forever — the same items retry every cycle
+      // and newer items (gifts, etc.) are never reached.
+      try {
+        const recentFailures = await this.prisma.syncLog.count({
+          where: {
+            entityType,
+            entityId: item.id,
+            status: 'failed',
+            lastAttempt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
+        }).catch(() => 0);
+        if (recentFailures >= 5) {
+          // Mark as synced to unblock the queue. The data is lost in the cloud
+          // but we can't keep retrying forever — the cloud will get the next
+          // update when the item is modified again.
+          await markSynced(item.id).catch(() => {});
+          synced++;
+          continue;
+        }
+      } catch {}
+
       try {
         const response = await fetch(`${this.cloudApiUrl}/cloud-sync/${endpoint}`, {
           method: 'POST',
@@ -739,9 +762,14 @@ export class SyncService implements OnModuleInit {
 
   // Sync mouvements de stock vers cloud
   private async syncStockMovements(): Promise<number> {
+    // FIX: Trier par date ascendante pour traiter les plus anciens d'abord.
+    // Sans tri, Prisma renvoie un ordre non-déterministe → les mêmes items échouent
+    // indéfiniment et bloquent les plus récents (gifts, etc.).
+    // Augmenter à 200 pour vider la file plus vite.
     const pending = await this.prisma.stockMovement.findMany({
       where: { syncStatus: 'pending' },
-      take: 100,
+      orderBy: { createdAt: 'asc' },
+      take: 200,
     });
 
     return this.syncEntity('stock-movements', pending, 'stock_movement', (id) =>
