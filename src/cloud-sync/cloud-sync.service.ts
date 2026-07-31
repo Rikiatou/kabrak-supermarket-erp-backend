@@ -536,6 +536,9 @@ export class CloudSyncService {
   async upsertStockMovement(data: any) {
     // FK NOT NULL: productId
     if (data.productId) await this.ensureStub('product', data.productId, data.tenantId);
+    // FK nullable: createdBy → Employee. If the employee doesn't exist in cloud,
+    // the FK constraint fails with 500. Create a stub or nullify.
+    if (data.createdBy) await this.ensureStub('employee', data.createdBy, data.tenantId);
 
     return this.prisma.stockMovement.upsert({
       where: { id: data.id },
