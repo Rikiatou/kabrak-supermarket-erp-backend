@@ -469,6 +469,19 @@ export class SyncService implements OnModuleInit {
         if (response.ok) {
           await markSynced(item.id);
           synced++;
+        } else {
+          const errText = await response.text().catch(() => '');
+          await this.prisma.syncLog.create({
+            data: {
+              entityType,
+              entityId: item.id,
+              action: 'upsert',
+              status: 'failed',
+              error: `HTTP ${response.status}: ${errText.slice(0, 200)}`,
+              attempts: 1,
+              lastAttempt: new Date(),
+            },
+          }).catch(() => {});
         }
       } catch (e: any) {
         await this.prisma.syncLog.create({

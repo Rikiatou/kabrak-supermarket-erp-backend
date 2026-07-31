@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 
+// Placeholder name for stub suppliers/products created when FK entity
+// hasn't been synced yet. Will be overwritten when the real entity arrives.
+const STUB_NAME = 'Pending sync';
+
 // Service exécuté sur le CLOUD pour recevoir les données sync depuis le local
 // Utilise upsert pour gérer create + update en un seul appel
 @Injectable()
@@ -23,7 +27,7 @@ export class CloudSyncService {
       // Champs NOT NULL minimaux par modèle
       switch (model) {
         case 'supplier':
-          stubData.name = '(en attente de sync)';
+          stubData.name = STUB_NAME;
           stubData.contact = '';
           stubData.phone = '';
           break;
@@ -39,7 +43,7 @@ export class CloudSyncService {
           break;
         case 'product':
           stubData.sku = `STUB-${id.slice(-8)}`;
-          stubData.name = '(en attente de sync)';
+          stubData.name = STUB_NAME;
           stubData.price = 0;
           stubData.stock = 0;
           stubData.unit = 'unité';
@@ -262,7 +266,7 @@ export class CloudSyncService {
   }
 
   async upsertPurchaseOrder(data: any) {
-    const { items, ...poData } = data;
+    const { items, syncStatus, syncedAt, updatedAt, ...poData } = data;
 
     // S'assurer que le supplier existe dans le cloud (FK NOT NULL)
     if (poData.supplierId) {
@@ -273,22 +277,28 @@ export class CloudSyncService {
       where: { id: poData.id },
       create: {
         ...poData,
-        orderDate: poData.orderDate ? new Date(poData.orderDate) : undefined,
+        date: poData.date ? new Date(poData.date) : undefined,
+        expectedDate: poData.expectedDate ? new Date(poData.expectedDate) : undefined,
+        receivedDate: poData.receivedDate ? new Date(poData.receivedDate) : undefined,
         createdAt: poData.createdAt ? new Date(poData.createdAt) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
       },
       update: {
         ...poData,
+        date: poData.date ? new Date(poData.date) : undefined,
+        expectedDate: poData.expectedDate ? new Date(poData.expectedDate) : undefined,
+        receivedDate: poData.receivedDate ? new Date(poData.receivedDate) : undefined,
         syncStatus: 'synced', syncedAt: new Date(),
       },
     });
 
     if (items && Array.isArray(items)) {
       for (const item of items) {
+        const { purchaseOrderId, ...itemData } = item;
         await this.prisma.purchaseOrderItem.upsert({
-          where: { id: item.id },
-          create: { ...item },
-          update: { ...item },
+          where: { id: itemData.id },
+          create: { ...itemData, purchaseOrderId: po.id },
+          update: { ...itemData, purchaseOrderId: po.id },
         }).catch(() => {});
       }
     }
