@@ -227,6 +227,119 @@ export class PurchaseOrdersService {
     return order;
   }
 
+  // Ajouter des articles à un bordereau DÉJÀ reçu, sans re-réceptionner les
+  // articles existants. Le stock n'est incrémenté QUE pour les nouveaux articles.
+  // Sert à compléter un bordereau en plusieurs passes (ex: 8 puis 12 de plus).
+  async addItems(
+    id: string,
+    items: CreatePurchaseOrderDto['items'],
+    createdBy?: string,
+  ) {
+    const order = await this.prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`Purchase order #${id} not found`);
+    }
+    if (!items || items.length === 0) {
+      return this.findOne(id);
+    }
+
+    // Résoudre les nouveaux produits (même logique que createAndReceive)
+    const resolved: Array<{
+      productId: string;
+      quantity: number;
+      unitCost: number;
+      sellPrice?: number;
+      expiryDate?: string;
+    }> = [];
+    for (const item of items) {
+      if (item.isNewProduct && item.newProductName) {
+        const prodCount = await this.prisma.product.count();
+        const autoSku =
+          item.newProductBarcode || `PRD-${String(prodCount + 1).padStart(5, '0')}`;
+        const newProduct = await this.prisma.product.create({
+          data: {
+            sku: autoSku,
+            barcode: item.newProductBarcode || autoSku,
+            name: item.newProductName,
+            category: item.newProductCategory || 'Grocery',
+            unit: item.newProductUnit || 'pc',
+            price: item.sellPrice || item.unitCost,
+            costPrice: item.unitCost,
+            taxRate: 0,
+            stock: 0,
+            minStock: 10,
+            isActive: true,
+            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+            supplierId: order.supplierId,
+          },
+        });
+        resolved.push({
+          productId: newProduct.id,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          sellPrice: item.sellPrice,
+          expiryDate: item.expiryDate,
+        });
+      } else {
+        resolved.push({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          sellPrice: item.sellPrice,
+          expiryDate: item.expiryDate,
+        });
+      }
+    }
+
+    let addedTotal = 0;
+    for (const item of resolved) {
+      addedTotal += item.quantity * item.unitCost;
+      await this.prisma.purchaseOrderItem.create({
+        data: {
+          purchaseOrderId: id,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          total: item.quantity * item.unitCost,
+          receivedQuantity: item.quantity,
+        },
+      });
+      await this.prisma.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: { increment: item.quantity },
+          ...(item.sellPrice ? { price: item.sellPrice } : {}),
+          ...(item.expiryDate ? { expiryDate: new Date(item.expiryDate) } : {}),
+        },
+      });
+      await this.prisma.stockMovement.create({
+        data: {
+          productId: item.productId,
+          type: 'in',
+          quantity: item.quantity,
+          reason: 'purchase',
+          reference: order.orderNumber,
+          notes: `Ajout au bordereau ${order.orderNumber}`,
+          createdBy: createdBy || undefined,
+        },
+      });
+    }
+
+    // Mettre à jour le total du bordereau (+ marquer à re-synchroniser)
+    await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: {
+        total: { increment: addedTotal },
+        syncStatus: 'pending',
+      },
+    });
+
+    return this.findOne(id);
+  }
+
   async updateStatus(id: string, status: string, createdBy?: string) {
     if (status === 'received') {
       const order = await this.prisma.purchaseOrder.findUnique({

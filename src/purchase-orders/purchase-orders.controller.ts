@@ -34,6 +34,16 @@ export class PurchaseOrdersController {
     return this.purchaseOrdersService.createAndReceive(dto, dto.invoiceNumber, req.user?.id);
   }
 
+  // Ajouter des articles à un bordereau existant (reçoit uniquement les nouveaux)
+  @Post(':id/items')
+  addItems(
+    @Param('id') id: string,
+    @Body() body: { items: CreatePurchaseOrderDto['items'] },
+    @Req() req: any,
+  ) {
+    return this.purchaseOrdersService.addItems(id, body.items, req.user?.id);
+  }
+
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body('status') status: string, @Req() req: any) {
     return this.purchaseOrdersService.updateStatus(id, status, req.user?.id);
