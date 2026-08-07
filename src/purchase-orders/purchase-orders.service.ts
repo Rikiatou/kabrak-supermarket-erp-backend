@@ -68,12 +68,15 @@ export class PurchaseOrdersService {
 
   async create(dto: CreatePurchaseOrderDto, createdBy?: string) {
     const year = new Date().getFullYear();
-    const count = await this.prisma.purchaseOrder.count({
-      where: {
-        orderNumber: { startsWith: `BC-${year}-` },
-      },
+    const existing = await this.prisma.purchaseOrder.findMany({
+      where: { orderNumber: { startsWith: `BC-${year}-` } },
+      select: { orderNumber: true },
     });
-    const orderNumber = `BC-${year}-${String(count + 1).padStart(4, '0')}`;
+    const maxSeq = existing.reduce((max, po) => {
+      const seq = parseInt(po.orderNumber.split('-')[2] || '0', 10);
+      return seq > max ? seq : max;
+    }, 0);
+    const orderNumber = `BC-${year}-${String(maxSeq + 1).padStart(4, '0')}`;
 
     const total = dto.items.reduce(
       (sum, item) => sum + item.quantity * item.unitCost,
@@ -107,12 +110,15 @@ export class PurchaseOrdersService {
 
   async createAndReceive(dto: CreatePurchaseOrderDto, invoiceNumber?: string, createdBy?: string) {
     const year = new Date().getFullYear();
-    const count = await this.prisma.purchaseOrder.count({
-      where: {
-        orderNumber: { startsWith: `BC-${year}-` },
-      },
+    const existing = await this.prisma.purchaseOrder.findMany({
+      where: { orderNumber: { startsWith: `BC-${year}-` } },
+      select: { orderNumber: true },
     });
-    const orderNumber = `BC-${year}-${String(count + 1).padStart(4, '0')}`;
+    const maxSeq = existing.reduce((max, po) => {
+      const seq = parseInt(po.orderNumber.split('-')[2] || '0', 10);
+      return seq > max ? seq : max;
+    }, 0);
+    const orderNumber = `BC-${year}-${String(maxSeq + 1).padStart(4, '0')}`;
 
     // Étape 1: Créer les nouveaux produits s'il y en a
     const resolvedItems: Array<{ productId: string; quantity: number; unitCost: number }> = [];

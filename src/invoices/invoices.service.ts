@@ -45,10 +45,17 @@ export class InvoicesService {
 
   async create(dto: CreateInvoiceDto, createdBy?: string) {
     const year = new Date().getFullYear();
-    const count = await this.prisma.invoice.count({
+    // Find the highest existing number for this year to avoid collisions
+    // when invoices have been deleted (count+1 would reuse a deleted number).
+    const existing = await this.prisma.invoice.findMany({
       where: { number: { startsWith: `FAC-${year}-` } },
+      select: { number: true },
     });
-    const number = `FAC-${year}-${String(count + 1).padStart(4, '0')}`;
+    const maxSeq = existing.reduce((max, inv) => {
+      const seq = parseInt(inv.number.split('-')[2] || '0', 10);
+      return seq > max ? seq : max;
+    }, 0);
+    const number = `FAC-${year}-${String(maxSeq + 1).padStart(4, '0')}`;
 
     const items = dto.items.map((item) => ({
       description: item.description,

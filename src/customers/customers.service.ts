@@ -63,8 +63,15 @@ export class CustomersService {
   }
 
   async create(dto: CreateCustomerDto, createdBy?: string) {
-    const count = await this.prisma.customer.count();
-    const customerNumber = `KAB-${String(count + 1).padStart(6, '0')}`;
+    // Find max existing customer number to avoid collisions after deletions
+    const allCustomers = await this.prisma.customer.findMany({
+      select: { customerNumber: true },
+    });
+    const maxNum = allCustomers.reduce((max, c) => {
+      const num = parseInt(c.customerNumber.replace('KAB-', '') || '0', 10);
+      return num > max ? num : max;
+    }, 0);
+    const customerNumber = `KAB-${String(maxNum + 1).padStart(6, '0')}`;
 
     // Vérifier si le téléphone existe déjà
     const existing = await this.prisma.customer.findFirst({
