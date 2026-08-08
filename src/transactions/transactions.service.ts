@@ -10,28 +10,32 @@ export class TransactionsService {
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
   async create(createTransactionDto: CreateTransactionDto) {
-    // Générer numéro de transaction unique (avec retry)
-    // FIX: Utiliser la date en heure LOCALE (pas UTC) pour le numéro de transaction.
-    // Une vente à 00:28 local (31 juillet) doit générer TXN-20260731-0001, pas TXN-20260730-...
-    // toISOString() retourne UTC → décalage d'1h après minuit local (Cameroun UTC+1).
+    // Générer numéro de transaction unique
+    // FIX: Utiliser le MAX au lieu du COUNT pour éviter les collisions après suppressions
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-    const count = await this.prisma.transaction.count({
-      where: {
-        transactionNumber: { startsWith: `TXN-${dateStr}-` },
-      },
+    const prefix = `TXN-${dateStr}-`;
+    const lastTx = await this.prisma.transaction.findFirst({
+      where: { transactionNumber: { startsWith: prefix } },
+      orderBy: { transactionNumber: 'desc' },
+      select: { transactionNumber: true },
     });
-    let seq = count + 1;
-    let transactionNumber = `TXN-${dateStr}-${String(seq).padStart(4, '0')}`;
+    let seq = 1;
+    if (lastTx) {
+      const lastSeq = parseInt(lastTx.transactionNumber.slice(prefix.length), 10);
+      if (!isNaN(lastSeq)) seq = lastSeq + 1;
+    }
+    let transactionNumber = `${prefix}${String(seq).padStart(4, '0')}`;
 
-    // Vérifier que le numéro n'existe pas déjà (retry jusqu'à 100 fois pour couvrir les trous)
-    for (let i = 0; i < 100; i++) {
+    // Vérifier que le numéro n'existe pas déjà (retry limité)
+    for (let i = 0; i < 10; i++) {
       const exists = await this.prisma.transaction.findFirst({
         where: { transactionNumber },
+        select: { id: true },
       });
       if (!exists) break;
       seq++;
-      transactionNumber = `TXN-${dateStr}-${String(seq).padStart(4, '0')}`;
+      transactionNumber = `${prefix}${String(seq).padStart(4, '0')}`;
     }
 
     // Transaction dans une transaction DB (atomicité) — timeout 30s pour mini PC
@@ -127,8 +131,8 @@ export class TransactionsService {
 
       return tx;
     }, {
-      timeout: 30000, // 30 secondes au lieu de 5 (mini PC peut être lent)
-      maxWait: 60000, // attendre jusqu'à 60s pour obtenir la connexion
+      timeout: 60000, // 60 secondes pour les ventes avec beaucoup d'articles
+      maxWait: 90000, // attendre jusqu'à 90s pour obtenir la connexion
     });
 
     return transaction;
