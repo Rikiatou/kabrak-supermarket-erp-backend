@@ -295,11 +295,15 @@ export class CloudSyncService {
     if (items && Array.isArray(items)) {
       for (const item of items) {
         const { purchaseOrderId, ...itemData } = item;
+        // S'assurer que le product existe dans le cloud (FK NOT NULL)
+        if (itemData.productId) {
+          await this.ensureStub('product', itemData.productId, poData.tenantId);
+        }
         await this.prisma.purchaseOrderItem.upsert({
           where: { id: itemData.id },
           create: { ...itemData, purchaseOrderId: po.id },
           update: { ...itemData, purchaseOrderId: po.id },
-        }).catch(() => {});
+        }).catch((e) => { console.error(`PO item upsert failed for item ${itemData.id}:`, e?.message); });
       }
     }
     return po;
