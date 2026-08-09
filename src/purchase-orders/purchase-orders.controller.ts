@@ -44,6 +44,17 @@ export class PurchaseOrdersController {
     return this.purchaseOrdersService.addItems(id, body.items, req.user?.id);
   }
 
+  // Modifier un article existant (correction quantité/coût) — garde la date originale
+  @Patch(':id/items/:itemId')
+  updateItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: { quantity?: number; unitCost?: number },
+    @Req() req: any,
+  ) {
+    return this.purchaseOrdersService.updateItem(id, itemId, body, req.user?.id);
+  }
+
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body('status') status: string, @Req() req: any) {
     return this.purchaseOrdersService.updateStatus(id, status, req.user?.id);

@@ -7,7 +7,9 @@ export class ReturnsController {
 
   @Post()
   create(@Body() dto: any, @Req() req: any) {
-    return this.returnsService.create(dto, req.licenseKey, req.employeeId);
+    // createdBy: priorité au body (envoyé par le frontend), sinon req.user (auth guard)
+    const createdBy = dto?.createdBy || req.user?.id || req.employeeId;
+    return this.returnsService.create(dto, req.licenseKey, createdBy);
   }
 
   @Get()

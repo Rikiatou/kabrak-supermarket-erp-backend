@@ -346,6 +346,82 @@ export class PurchaseOrdersService {
     return this.findOne(id);
   }
 
+  // Modifier un article existant d'un bordereau (correction de quantité/coût).
+  // Ajuste le stock du delta et garde la DATE ORIGINALE du bordereau intacte.
+  // quantity = 0 supprime l'article.
+  async updateItem(
+    orderId: string,
+    itemId: string,
+    data: { quantity?: number; unitCost?: number },
+    createdBy?: string,
+  ) {
+    const order = await this.prisma.purchaseOrder.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException(`Purchase order #${orderId} not found`);
+    }
+    const item = await this.prisma.purchaseOrderItem.findUnique({
+      where: { id: itemId },
+    });
+    if (!item || item.purchaseOrderId !== orderId) {
+      throw new NotFoundException(`Item #${itemId} not found in order`);
+    }
+
+    const oldQty = item.quantity;
+    const newQty = data.quantity != null ? data.quantity : oldQty;
+    const newCost = data.unitCost != null ? data.unitCost : item.unitCost;
+    const delta = newQty - oldQty; // >0 = reçu plus, <0 = reçu moins
+
+    // Ajuster le stock du produit selon le delta
+    if (delta !== 0) {
+      await this.prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: delta }, syncStatus: 'pending' },
+      });
+      await this.prisma.stockMovement.create({
+        data: {
+          productId: item.productId,
+          type: delta > 0 ? 'in' : 'out',
+          quantity: delta,
+          reason: 'purchase',
+          reference: order.orderNumber,
+          notes: `Correction bordereau ${order.orderNumber}: ${oldQty} → ${newQty}`,
+          createdBy: createdBy || undefined,
+        },
+      });
+    }
+
+    const oldItemTotal = item.total;
+
+    if (newQty <= 0) {
+      // Supprimer l'article
+      await this.prisma.purchaseOrderItem.delete({ where: { id: itemId } });
+    } else {
+      await this.prisma.purchaseOrderItem.update({
+        where: { id: itemId },
+        data: {
+          quantity: newQty,
+          unitCost: newCost,
+          total: newQty * newCost,
+          receivedQuantity: newQty,
+        },
+      });
+    }
+
+    // Recalculer le total du bordereau (garde la date originale intacte)
+    const newItemTotal = newQty > 0 ? newQty * newCost : 0;
+    await this.prisma.purchaseOrder.update({
+      where: { id: orderId },
+      data: {
+        total: { increment: newItemTotal - oldItemTotal },
+        syncStatus: 'pending',
+      },
+    });
+
+    return this.findOne(orderId);
+  }
+
   async updateStatus(id: string, status: string, createdBy?: string) {
     if (status === 'received') {
       const order = await this.prisma.purchaseOrder.findUnique({
