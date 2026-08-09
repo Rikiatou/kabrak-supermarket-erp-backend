@@ -230,6 +230,9 @@ export class ShiftsService {
     const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
     const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
+    // Credit invoices — factures créées pendant le shift avec solde impayé (crédit client)
+    const creditInvoices = await this.buildCreditInvoices(shift.employeeId, startTime, endTime);
+
     // Net sales = POS sales (incluant les transactions INV-PAY-) - returns
     // Les paiements de factures sont déjà dans les transactions (préfixe INV-PAY-)
     // donc ils sont déjà comptés dans cashReceipts et netSales
@@ -237,6 +240,7 @@ export class ShiftsService {
 
     return {
       shiftId: shift.id,
+      creditInvoices,
       registerId: shift.registerId,
       registerName: shift.registerName || shift.registerId,
       employeeId: shift.employeeId,
@@ -324,6 +328,47 @@ export class ShiftsService {
     }
 
     return Array.from(productMap.values()).sort((a, b) => b.total - a.total);
+  }
+
+  // Construire la liste des factures à crédit (impayées ou partiellement payées)
+  // créées pendant la période par ce caissier — pour affichage informatif dans le Z-Report.
+  // Ces montants NE sont PAS ajoutés au total du jour (seuls les versements reçus le sont).
+  private async buildCreditInvoices(
+    employeeId: string,
+    start: Date,
+    end: Date,
+  ) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        createdBy: employeeId,
+        date: { gte: start, lte: end },
+        status: { in: ['sent', 'partial', 'overdue', 'draft'] },
+        balance: { gt: 0 },
+      },
+      select: {
+        number: true,
+        clientName: true,
+        total: true,
+        paidAmount: true,
+        balance: true,
+        status: true,
+        items: { select: { description: true, quantity: true } },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    return invoices.map((inv) => ({
+      number: inv.number,
+      clientName: inv.clientName,
+      total: inv.total,
+      paidAmount: inv.paidAmount,
+      balance: inv.balance,
+      // "partial" si un acompte a été versé, sinon "unpaid"
+      status: inv.paidAmount > 0 ? 'partial' : 'unpaid',
+      items: inv.items
+        .map((it) => `${it.description} x${it.quantity}`)
+        .join(', '),
+    }));
   }
 
   // Z-Report journalier par caissier (sans dépendre des shifts)
@@ -443,6 +488,9 @@ export class ShiftsService {
     const invoiceMobile = invoicePayments.filter(p => p.method === 'mobile' || p.method === 'orange').reduce((s, p) => s + p.amount, 0);
     const invoiceTotal = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
+    // Credit invoices — factures créées ce jour avec solde impayé (crédit client)
+    const creditInvoices = await this.buildCreditInvoices(employeeId, dayStart, dayEnd);
+
     // Net sales = POS sales (incluant INV-PAY-) - returns
     // Les paiements de factures sont déjà dans les transactions (préfixe INV-PAY-)
     const adjustedNetSales = netSales - returnsAndCredits;
@@ -468,6 +516,7 @@ export class ShiftsService {
 
     return {
       shiftId: `daily-${dateStr}-${employeeId}`,
+      creditInvoices,
       registerId,
       registerName,
       employeeId,
