@@ -39,6 +39,8 @@ export class ShiftsService {
         difference,
         status: 'closed',
         notes: dto.notes,
+        syncStatus: 'pending',
+        syncedAt: null,
       },
     });
   }
