@@ -188,12 +188,6 @@ export class ShiftsService {
     // Total receipts = somme des ventes par méthode (split déjà décomposé)
     const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts;
 
-    // Cash drawer = opening cash + cash physically received - change given
-    const cashDrawerTotal = shift.openingCash + cashReceived - changeGiven;
-
-    // Total expected = opening cash + all sales (non-cash) - change given
-    const totalExpected = shift.openingCash + cardReceipts + mobileReceipts + orangeReceipts + cashReceived - changeGiven;
-
     // Returns & credits — from refunded transactions
     const refundedTx = await this.prisma.transaction.aggregate({
       where: {
@@ -214,7 +208,26 @@ export class ShiftsService {
       _sum: { totalRefunded: true },
     });
 
+    // Cash refunds — remboursements/échanges payés en espèces (sortent du tiroir).
+    // Ils réduisent le cash physique attendu dans la caisse.
+    const cashReturnsAgg = await this.prisma.productReturn.aggregate({
+      where: {
+        createdBy: shift.employeeId,
+        returnDate: { gte: startTime, lte: endTime },
+        status: 'completed',
+        refundMethod: 'cash',
+      },
+      _sum: { totalRefunded: true },
+    });
+    const cashReturns = cashReturnsAgg._sum.totalRefunded || 0;
+
     const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
+
+    // Cash drawer = opening cash + cash physically received - change given - cash refunds
+    const cashDrawerTotal = shift.openingCash + cashReceived - changeGiven - cashReturns;
+
+    // Total expected = opening cash + all sales (non-cash) - change given - cash refunds
+    const totalExpected = shift.openingCash + cardReceipts + mobileReceipts + orangeReceipts + cashReceived - changeGiven - cashReturns;
 
     // Invoice payments collected by this cashier during the shift
     const invoicePayments = await this.prisma.invoicePayment.findMany({
@@ -255,6 +268,7 @@ export class ShiftsService {
 
       grossSales: grossSales,
       returnsAndCredits,
+      cashReturns,
       totalDiscount,
       totalTax,
       netSales: adjustedNetSales,
@@ -474,6 +488,18 @@ export class ShiftsService {
 
     const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
 
+    // Cash refunds — remboursements/échanges payés en espèces (sortent du tiroir).
+    const cashReturnsAgg = await this.prisma.productReturn.aggregate({
+      where: {
+        createdBy: employeeId,
+        returnDate: { gte: dayStart, lte: dayEnd },
+        status: 'completed',
+        refundMethod: 'cash',
+      },
+      _sum: { totalRefunded: true },
+    });
+    const cashReturns = cashReturnsAgg._sum.totalRefunded || 0;
+
     // Invoice payments collected by this cashier during the day
     const invoicePayments = await this.prisma.invoicePayment.findMany({
       where: {
@@ -509,7 +535,7 @@ export class ShiftsService {
 
     const openingCash = shifts.reduce((s, sh) => s + (sh.openingCash || 0), 0);
     const closingCash = shifts.reduce((s, sh) => s + (sh.closingCash || 0), 0);
-    const cashDrawerTotal = openingCash + cashReceived - changeGiven;
+    const cashDrawerTotal = openingCash + cashReceived - changeGiven - cashReturns;
 
     const registerId = shifts[0]?.registerId || transactions[0]?.registerId || 'N/A';
     const registerName = shifts[0]?.registerName || registerId;
@@ -531,6 +557,7 @@ export class ShiftsService {
 
       grossSales: grossSales,
       returnsAndCredits,
+      cashReturns,
       totalDiscount,
       totalTax,
       netSales: adjustedNetSales,
@@ -558,7 +585,7 @@ export class ShiftsService {
       changeGiven,
       cashReceived,
       cashDrawerTotal,
-      totalExpected: totalReceipts + openingCash - changeGiven,
+      totalExpected: totalReceipts + openingCash - changeGiven - cashReturns,
 
       customerCount,
       averageSale,

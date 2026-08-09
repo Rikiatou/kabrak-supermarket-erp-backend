@@ -362,6 +362,20 @@ export class SyncService implements OnModuleInit {
     let applied = 0;
     for (const sup of suppliers) {
       try {
+        // FIX: Don't overwrite local real names with cloud stub names.
+        // The cloud may have "(en attente de sync)" if a PO was synced
+        // before the supplier, creating a stub via ensureStub.
+        if (sup.name === '(en attente de sync)') {
+          const local = await this.prisma.supplier.findUnique({
+            where: { id: sup.id },
+            select: { name: true },
+          });
+          if (local && local.name !== '(en attente de sync)') {
+            // Local has a real name — skip this stub update
+            applied++;
+            continue;
+          }
+        }
         await this.prisma.supplier.upsert({
           where: { id: sup.id },
           create: {
