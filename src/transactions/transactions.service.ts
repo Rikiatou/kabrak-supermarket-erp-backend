@@ -10,6 +10,34 @@ export class TransactionsService {
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
   async create(createTransactionDto: CreateTransactionDto) {
+    // FIX: Déduplication — si une transaction identique (même caissier, même total,
+    // même méthode de paiement) a été créée dans les 2 dernières minutes, on la retourne
+    // au lieu d'en créer une nouvelle. Cela évite les doublons quand le réseau
+    // revient et que le frontend resoumet une transaction qui avait déjà réussi.
+    const dedupWindow = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes
+    const existing = await this.prisma.transaction.findFirst({
+      where: {
+        cashierId: createTransactionDto.cashierId,
+        total: createTransactionDto.total,
+        paymentMethod: createTransactionDto.paymentMethod,
+        date: { gte: dedupWindow },
+        status: 'completed',
+      },
+      include: {
+        items: { include: { product: true } },
+        cashier: true,
+      },
+      orderBy: { date: 'desc' },
+    }).catch(() => null);
+
+    if (existing) {
+      // Vérifier que les items correspondent aussi (même nombre d'articles)
+      if (existing.items.length === createTransactionDto.items.length) {
+        console.log(`⚠️ Transaction dupliquée évitée — retour de ${existing.transactionNumber}`);
+        return existing;
+      }
+    }
+
     // Générer numéro de transaction unique
     // FIX: Utiliser le MAX au lieu du COUNT pour éviter les collisions après suppressions
     const now = new Date();
