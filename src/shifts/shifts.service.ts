@@ -251,6 +251,21 @@ export class ShiftsService {
     // Credit invoices — factures créées pendant le shift avec solde impayé (crédit client)
     const creditInvoices = await this.buildCreditInvoices(shift.employeeId, startTime, endTime);
 
+    // Invoice discounts — remises appliquées sur les factures créées pendant le shift.
+    // Les paiements INV-PAY ont discount=0, donc la remise facture n'apparaissait pas.
+    // On l'ajoute au grossSales ET au totalDiscount pour que la ligne remise du Z-report
+    // reflète aussi les remises factures (net inchangé : gross+X - discount+X = net).
+    const invoiceDiscountAgg = await this.prisma.invoice.aggregate({
+      where: {
+        createdBy: shift.employeeId,
+        date: { gte: startTime, lte: endTime },
+      },
+      _sum: { discount: true },
+    });
+    const invoiceDiscount = invoiceDiscountAgg._sum.discount || 0;
+    const grossSalesTotal = grossSales + invoiceDiscount;
+    const totalDiscountAll = totalDiscount + invoiceDiscount;
+
     // Net sales = POS sales (incluant les transactions INV-PAY-) - returns
     // Les paiements de factures sont déjà dans les transactions (préfixe INV-PAY-)
     // donc ils sont déjà comptés dans cashReceipts et netSales
@@ -271,10 +286,10 @@ export class ShiftsService {
       difference: shift.difference,
       notes: shift.notes,
 
-      grossSales: grossSales,
+      grossSales: grossSalesTotal,
       returnsAndCredits,
       cashReturns,
-      totalDiscount,
+      totalDiscount: totalDiscountAll,
       totalTax,
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
@@ -527,6 +542,18 @@ export class ShiftsService {
     // Credit invoices — factures créées ce jour avec solde impayé (crédit client)
     const creditInvoices = await this.buildCreditInvoices(employeeId, dayStart, dayEnd);
 
+    // Invoice discounts — remises appliquées sur les factures créées ce jour.
+    const invoiceDiscountAgg = await this.prisma.invoice.aggregate({
+      where: {
+        createdBy: employeeId,
+        date: { gte: dayStart, lte: dayEnd },
+      },
+      _sum: { discount: true },
+    });
+    const invoiceDiscount = invoiceDiscountAgg._sum.discount || 0;
+    const grossSalesTotal = grossSales + invoiceDiscount;
+    const totalDiscountAll = totalDiscount + invoiceDiscount;
+
     // Net sales = POS sales (incluant INV-PAY-) - returns
     // Les paiements de factures sont déjà dans les transactions (préfixe INV-PAY-)
     const adjustedNetSales = netSales - returnsAndCredits;
@@ -565,10 +592,10 @@ export class ShiftsService {
       difference: closingCash - cashDrawerTotal,
       notes: `Z-Report journalier — ${dateStr}`,
 
-      grossSales: grossSales,
+      grossSales: grossSalesTotal,
       returnsAndCredits,
       cashReturns,
-      totalDiscount,
+      totalDiscount: totalDiscountAll,
       totalTax,
       netSales: adjustedNetSales,
       nonTaxableSales: adjustedNetSales - totalTax,
