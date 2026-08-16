@@ -530,6 +530,7 @@ model SyncLog {
 
   @@index([status])
   @@index([entityType, entityId])
+  @@index([entityType, entityId, status, lastAttempt])
   @@index([createdAt])
   @@index([tenantId])
   

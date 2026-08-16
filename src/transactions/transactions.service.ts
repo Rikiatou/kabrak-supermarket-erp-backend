@@ -159,8 +159,8 @@ export class TransactionsService {
 
       return tx;
     }, {
-      timeout: 60000, // 60 secondes pour les ventes avec beaucoup d'articles
-      maxWait: 90000, // attendre jusqu'à 90s pour obtenir la connexion
+      timeout: 30000, // 30s max pour la transaction (réduit de 60s)
+      maxWait: 15000, // attendre max 15s pour obtenir une connexion (réduit de 90s)
     });
 
     return transaction;

@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
+import { SyncPrismaService } from './sync-prisma.service';
 
 @Injectable()
 export class SyncService implements OnModuleInit {
@@ -26,8 +27,13 @@ export class SyncService implements OnModuleInit {
   private cloudDataCacheAt: number = 0;
   private readonly CLOUD_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
+  // Track last product pull to space it out (products are large, pull less often)
+  private lastProductPull: number = 0;
+  private readonly PRODUCT_PULL_INTERVAL = 60 * 60 * 1000; // 1 hour
+
   constructor(
     private prisma: PrismaService,
+    private syncPrisma: SyncPrismaService,
     private configService: ConfigService,
   ) {
     this.cloudApiUrl = this.configService.get<string>('CLOUD_API_URL', '');
@@ -76,6 +82,8 @@ export class SyncService implements OnModuleInit {
         await this.syncAll();
         // Pull cloud → local (reverse sync)
         await this.pullFromCloud();
+        // Purge old SyncLog entries (keep last 7 days only)
+        await this.purgeSyncLog();
       } finally {
         this.isSyncing = false;
         const duration = Date.now() - startTime;
@@ -92,12 +100,17 @@ export class SyncService implements OnModuleInit {
 
     try {
       // Get last pull timestamp from DB
-      const lastPull = await this.prisma.syncLog.findFirst({
+      const lastPull = await this.syncPrisma.syncLog.findFirst({
         where: { entityType: 'reverse_sync', action: 'pull' },
         orderBy: { lastAttempt: 'desc' },
       }).catch(() => null);
 
       const since = lastPull?.lastAttempt?.toISOString() || new Date(0).toISOString();
+
+      // FIX: Space out product pulls — they're huge and rarely change.
+      // Pull products only once per hour, but pull small entities every cycle.
+      const now = Date.now();
+      const shouldPullProducts = (now - this.lastProductPull) >= this.PRODUCT_PULL_INTERVAL;
 
       // FIX: Paginate products (the large table) to avoid loading tens of
       // thousands of rows into memory at once on the mini-PC. Other entities
@@ -114,8 +127,11 @@ export class SyncService implements OnModuleInit {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
 
+        // Skip products if not time yet (pull only once per hour)
+        const productsLimit = shouldPullProducts ? PAGE_SIZE : 0;
+
         const url = `${this.cloudApiUrl}/cloud-sync/pull?since=${encodeURIComponent(since)}`
-          + `&productsLimit=${PAGE_SIZE}&productsOffset=${offset}`
+          + `&productsLimit=${productsLimit}&productsOffset=${offset}`
           + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : '');
 
         const response = await fetch(url, {
@@ -134,7 +150,11 @@ export class SyncService implements OnModuleInit {
 
         if (productsTotal === null && data.productsTotal != null) {
           productsTotal = data.productsTotal;
-          console.log(`⬇️ Pull: ${productsTotal} products to fetch (paged ${PAGE_SIZE}/page)`);
+          if (shouldPullProducts) {
+            console.log(`⬇️ Pull: ${productsTotal} products to fetch (paged ${PAGE_SIZE}/page)`);
+          } else {
+            console.log(`⬇️ Pull: skipping products (last pull ${Math.round((now - this.lastProductPull) / 60000)}min ago)`);
+          }
         }
 
         // Small entities: apply only once (first page)
@@ -148,13 +168,15 @@ export class SyncService implements OnModuleInit {
           smallEntitiesApplied = true;
         }
 
-        // Products: apply every page
-        const before = applied;
-        applied += await this.applyProducts(data.products || []);
-        page++;
-        console.log(`⬇️ Pull page ${page}: +${applied - before} products (offset ${offset})`);
+        // Products: apply every page (only if shouldPullProducts)
+        if (shouldPullProducts) {
+          const before = applied;
+          applied += await this.applyProducts(data.products || []);
+          page++;
+          console.log(`⬇️ Pull page ${page}: +${applied - before} products (offset ${offset})`);
+        }
 
-        if (!data.productsHasMore) break;
+        if (!data.productsHasMore || !shouldPullProducts) break;
         offset += PAGE_SIZE;
 
         // Safety valve: never loop forever even if cloud misreports
@@ -165,9 +187,14 @@ export class SyncService implements OnModuleInit {
         }
       }
 
+      // Update product pull timestamp only if we actually pulled products
+      if (shouldPullProducts) {
+        this.lastProductPull = now;
+      }
+
       // Log the pull ONLY after the final page succeeds, so a crash mid-pull
       // restarts from the same `since` timestamp on the next cycle.
-      await this.prisma.syncLog.create({
+      await this.syncPrisma.syncLog.create({
         data: {
           entityType: 'reverse_sync',
           entityId: 'pull',
@@ -184,6 +211,21 @@ export class SyncService implements OnModuleInit {
     }
   }
 
+  // Purge old SyncLog entries to prevent table bloat
+  private async purgeSyncLog(): Promise<void> {
+    try {
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days
+      const deleted = await this.syncPrisma.syncLog.deleteMany({
+        where: { createdAt: { lt: cutoff } },
+      });
+      if (deleted.count > 0) {
+        console.log(`🗑️ Purged ${deleted.count} old SyncLog entries (>7 days)`);
+      }
+    } catch (e: any) {
+      console.log(`🗑️ SyncLog purge error: ${e.message}`);
+    }
+  }
+
   // --- Pull helpers (extracted from pullFromCloud for readability) ---
 
   private async applyEmployees(employees: any[]): Promise<number> {
@@ -191,12 +233,12 @@ export class SyncService implements OnModuleInit {
     for (const emp of employees) {
       try {
         const tenantId = emp.tenantId || null;
-        const existing = await this.prisma.employee.findFirst({
+        const existing = await this.syncPrisma.employee.findFirst({
           where: { employeeNumber: emp.employeeNumber, tenantId },
           select: { id: true },
         });
         if (existing) {
-          await this.prisma.employee.update({
+          await this.syncPrisma.employee.update({
             where: { id: existing.id },
             data: {
               firstName: emp.firstName, lastName: emp.lastName,
@@ -209,7 +251,7 @@ export class SyncService implements OnModuleInit {
             },
           });
         } else {
-          await this.prisma.employee.create({
+          await this.syncPrisma.employee.create({
             data: {
               id: emp.id, employeeNumber: emp.employeeNumber,
               firstName: emp.firstName, lastName: emp.lastName,
@@ -231,53 +273,72 @@ export class SyncService implements OnModuleInit {
   }
 
   private async applyProducts(products: any[]): Promise<number> {
+    if (products.length === 0) return 0;
+
+    // BATCH: Fetch all existing products in ONE query instead of N
+    const ids = products.map(p => p.id).filter(Boolean);
+    const skus = products.map(p => p.sku).filter(Boolean);
+    const barcodes = products.map(p => p.barcode).filter(Boolean);
+
+    const existing = await this.syncPrisma.product.findMany({
+      where: {
+        OR: [
+          { id: { in: ids } },
+          { sku: { in: skus } },
+          ...(barcodes.length > 0 ? [{ barcode: { in: barcodes } }] : []),
+        ],
+      },
+      select: { id: true, sku: true, barcode: true, updatedAt: true },
+    });
+
+    const existingMap = new Map<string, any>();
+    for (const e of existing) {
+      existingMap.set(e.id, e);
+      if (e.sku) existingMap.set(e.sku, e);
+      if (e.barcode) existingMap.set(e.barcode, e);
+    }
+
     let applied = 0;
     for (const prod of products) {
       try {
-        // Try to find existing product by id, sku, or barcode
-        const existing = await this.prisma.product.findFirst({
-          where: { OR: [{ id: prod.id }, { sku: prod.sku }, ...(prod.barcode ? [{ barcode: prod.barcode }] : [])] },
-          select: { id: true },
-        });
+        const match = existingMap.get(prod.id) || existingMap.get(prod.sku) || (prod.barcode && existingMap.get(prod.barcode));
 
-        if (existing) {
-          // Update existing product (don't change barcode/sku to avoid conflicts)
-          await this.prisma.product.update({
-            where: { id: existing.id },
-            data: {
-              name: prod.name, description: prod.description,
-              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
-              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
-              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
-              packBarcode: prod.packBarcode,
-              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
-              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
-              markdownExpiresAt: prod.markdownExpiresAt,
-              minStock: prod.minStock, maxStock: prod.maxStock,
-              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
-              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
-              tenantId: prod.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
-            },
+        const common = {
+          name: prod.name, description: prod.description,
+          category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
+          price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
+          wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
+          packBarcode: prod.packBarcode,
+          markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
+          markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
+          markdownExpiresAt: prod.markdownExpiresAt,
+          minStock: prod.minStock, maxStock: prod.maxStock,
+          unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
+          supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
+          tenantId: prod.tenantId || null,
+          syncStatus: 'synced', syncedAt: new Date(),
+        };
+
+        if (match) {
+          // SKIP no-op: if cloud updatedAt <= local updatedAt, skip update
+          // (local changes are fresher, don't overwrite with stale cloud data)
+          const cloudUpdated = prod.updatedAt ? new Date(prod.updatedAt).getTime() : 0;
+          const localUpdated = match.updatedAt ? new Date(match.updatedAt).getTime() : 0;
+          if (cloudUpdated <= localUpdated) {
+            applied++;
+            continue;
+          }
+
+          await this.syncPrisma.product.update({
+            where: { id: match.id },
+            data: common,
           });
         } else {
-          // Create new product
-          await this.prisma.product.create({
+          await this.syncPrisma.product.create({
             data: {
+              ...common,
               id: prod.id, sku: prod.sku, barcode: prod.barcode,
-              name: prod.name, description: prod.description,
-              category: prod.category, subCategory: prod.subCategory, brand: prod.brand,
-              price: prod.price, costPrice: prod.costPrice, taxRate: prod.taxRate,
-              wholesalePrice: prod.wholesalePrice, packQuantity: prod.packQuantity,
-              packBarcode: prod.packBarcode,
-              markdownPrice: prod.markdownPrice, markdownReason: prod.markdownReason,
-              markdownNote: prod.markdownNote, markdownStartsAt: prod.markdownStartsAt,
-              markdownExpiresAt: prod.markdownExpiresAt,
-              stock: prod.stock, minStock: prod.minStock, maxStock: prod.maxStock,
-              unit: prod.unit, expiryDate: prod.expiryDate ? new Date(prod.expiryDate) : null,
-              supplierId: prod.supplierId, imageUrl: prod.imageUrl, isActive: prod.isActive,
-              tenantId: prod.tenantId || null,
-              syncStatus: 'synced', syncedAt: new Date(),
+              stock: prod.stock,
             },
           });
         }
@@ -294,7 +355,7 @@ export class SyncService implements OnModuleInit {
     for (const reg of registers) {
       try {
         const tenantId = reg.tenantId || null;
-        const existing = await this.prisma.cashRegister.findFirst({
+        const existing = await this.syncPrisma.cashRegister.findFirst({
           where: { code: reg.code, tenantId },
           select: { id: true },
         });
@@ -306,12 +367,12 @@ export class SyncService implements OnModuleInit {
           syncStatus: 'synced', syncedAt: new Date(),
         };
         if (existing) {
-          await this.prisma.cashRegister.update({
+          await this.syncPrisma.cashRegister.update({
             where: { id: existing.id },
             data: common,
           });
         } else {
-          await this.prisma.cashRegister.create({
+          await this.syncPrisma.cashRegister.create({
             data: { ...common, id: reg.id, code: reg.code },
           });
         }
@@ -328,7 +389,7 @@ export class SyncService implements OnModuleInit {
     for (const cust of customers) {
       try {
         const tenantId = cust.tenantId || null;
-        const existing = await this.prisma.customer.findFirst({
+        const existing = await this.syncPrisma.customer.findFirst({
           where: { customerNumber: cust.customerNumber, tenantId },
           select: { id: true },
         });
@@ -341,12 +402,12 @@ export class SyncService implements OnModuleInit {
           syncStatus: 'synced', syncedAt: new Date(),
         };
         if (existing) {
-          await this.prisma.customer.update({
+          await this.syncPrisma.customer.update({
             where: { id: existing.id },
             data: common,
           });
         } else {
-          await this.prisma.customer.create({
+          await this.syncPrisma.customer.create({
             data: { ...common, id: cust.id, customerNumber: cust.customerNumber, createdBy: cust.createdBy || null },
           });
         }
@@ -366,7 +427,7 @@ export class SyncService implements OnModuleInit {
         // The cloud may have "(en attente de sync)" if a PO was synced
         // before the supplier, creating a stub via ensureStub.
         if (sup.name === '(en attente de sync)') {
-          const local = await this.prisma.supplier.findUnique({
+          const local = await this.syncPrisma.supplier.findUnique({
             where: { id: sup.id },
             select: { name: true },
           });
@@ -376,7 +437,7 @@ export class SyncService implements OnModuleInit {
             continue;
           }
         }
-        await this.prisma.supplier.upsert({
+        await this.syncPrisma.supplier.upsert({
           where: { id: sup.id },
           create: {
             id: sup.id, name: sup.name, contact: sup.contact,
@@ -411,7 +472,7 @@ export class SyncService implements OnModuleInit {
     let applied = 0;
     for (const sch of schedules) {
       try {
-        await this.prisma.schedule.upsert({
+        await this.syncPrisma.schedule.upsert({
           where: { id: sch.id },
           create: {
             id: sch.id, employeeId: sch.employeeId, registerId: sch.registerId,
@@ -460,6 +521,45 @@ export class SyncService implements OnModuleInit {
   }
 
   // Helper générique: POST vers /cloud-sync/<endpoint> et marque synced
+  /**
+   * IDs "bloqués": items ayant échoué >= MAX_FAILURES fois dans les dernières 24h.
+   *
+   * Ils sont EXCLUS de la requête SQL des items pending (via `notIn`), et non
+   * pas seulement sautés dans la boucle. Sinon ils occuperaient les places du
+   * `take: N` et bloqueraient les items récents — exactement le bug que
+   * l'ancien code "réglait" en les marquant `synced` (= perte de données).
+   *
+   * Ils restent `syncStatus: 'pending'` : AUCUNE donnée n'est perdue. Ils
+   * redeviennent éligibles automatiquement après 24h (fenêtre glissante).
+   */
+  private static readonly MAX_FAILURES = 5;
+  private static readonly MAX_BLOCKED = 500; // borne le `notIn` pour ne pas exploser la requête
+
+  private async getBlockedIds(entityType: string): Promise<string[]> {
+    const grouped = await this.syncPrisma.syncLog.groupBy({
+      by: ['entityId'],
+      where: {
+        entityType,
+        status: 'failed',
+        lastAttempt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      _count: { entityId: true },
+      having: { entityId: { _count: { gte: SyncService.MAX_FAILURES } } },
+      orderBy: { _count: { entityId: 'desc' } },
+      take: SyncService.MAX_BLOCKED,
+    }).catch(() => [] as any[]);
+
+    return (grouped as any[]).map((g) => g.entityId as string);
+  }
+
+  /** Clause `where` pour les items à pousser, en excluant les items bloqués. */
+  private async pendingWhere(entityType: string): Promise<any> {
+    const blocked = await this.getBlockedIds(entityType);
+    if (blocked.length === 0) return { syncStatus: 'pending' };
+    console.log(`⏭️ ${entityType}: ${blocked.length} item(s) en échec répété, exclus de ce cycle (toujours pending, non perdus)`);
+    return { syncStatus: 'pending', id: { notIn: blocked } };
+  }
+
   private async syncEntity(
     endpoint: string,
     pending: any[],
@@ -470,29 +570,6 @@ export class SyncService implements OnModuleInit {
 
     let synced = 0;
     for (const item of pending) {
-      // FIX: Skip items that have failed 5+ times recently (last 24h).
-      // Without this, a single broken item (e.g. cloud 500 due to Neon quota)
-      // blocks the entire queue forever — the same items retry every cycle
-      // and newer items (gifts, etc.) are never reached.
-      try {
-        const recentFailures = await this.prisma.syncLog.count({
-          where: {
-            entityType,
-            entityId: item.id,
-            status: 'failed',
-            lastAttempt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-          },
-        }).catch(() => 0);
-        if (recentFailures >= 5) {
-          // Mark as synced to unblock the queue. The data is lost in the cloud
-          // but we can't keep retrying forever — the cloud will get the next
-          // update when the item is modified again.
-          await markSynced(item.id).catch(() => {});
-          synced++;
-          continue;
-        }
-      } catch {}
-
       try {
         const response = await fetch(`${this.cloudApiUrl}/cloud-sync/${endpoint}`, {
           method: 'POST',
@@ -508,7 +585,7 @@ export class SyncService implements OnModuleInit {
           synced++;
         } else {
           const errText = await response.text().catch(() => '');
-          await this.prisma.syncLog.create({
+          await this.syncPrisma.syncLog.create({
             data: {
               entityType,
               entityId: item.id,
@@ -521,7 +598,7 @@ export class SyncService implements OnModuleInit {
           }).catch(() => {});
         }
       } catch (e: any) {
-        await this.prisma.syncLog.create({
+        await this.syncPrisma.syncLog.create({
           data: {
             entityType,
             entityId: item.id,
@@ -618,13 +695,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync produits vers cloud
   private async syncProducts(): Promise<number> {
-    const pending = await this.prisma.product.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.product.findMany({
+      where: await this.pendingWhere('product'),
       take: 200,
     }).catch(() => []);
 
     return this.syncEntity('products', pending, 'product', (id) =>
-      this.prisma.product.update({
+      this.syncPrisma.product.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -633,13 +710,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync employés vers cloud
   private async syncEmployees(): Promise<number> {
-    const pending = await this.prisma.employee.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.employee.findMany({
+      where: await this.pendingWhere('employee'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('employees', pending, 'employee', (id) =>
-      this.prisma.employee.update({
+      this.syncPrisma.employee.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -648,13 +725,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync caisses vers cloud
   private async syncCashRegisters(): Promise<number> {
-    const pending = await this.prisma.cashRegister.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.cashRegister.findMany({
+      where: await this.pendingWhere('cash_register'),
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('cash-registers', pending, 'cash_register', (id) =>
-      this.prisma.cashRegister.update({
+      this.syncPrisma.cashRegister.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -699,7 +776,7 @@ export class SyncService implements OnModuleInit {
         // Batch: fetch all local employees in ONE query
         const cloudEmpNums = (data.employees || []).map((e: any) => e.employeeNumber).filter(Boolean);
         if (cloudEmpNums.length > 0) {
-          const localEmps = await this.prisma.employee.findMany({
+          const localEmps = await this.syncPrisma.employee.findMany({
             where: { employeeNumber: { in: cloudEmpNums } },
             select: { id: true, employeeNumber: true },
           });
@@ -715,7 +792,7 @@ export class SyncService implements OnModuleInit {
         // Batch: fetch all local registers in ONE query
         const cloudRegCodes = (data.cashRegisters || []).map((r: any) => r.code).filter(Boolean);
         if (cloudRegCodes.length > 0) {
-          const localRegs = await this.prisma.cashRegister.findMany({
+          const localRegs = await this.syncPrisma.cashRegister.findMany({
             where: { code: { in: cloudRegCodes } },
             select: { id: true, code: true },
           });
@@ -741,8 +818,8 @@ export class SyncService implements OnModuleInit {
   }
 
   private async syncTransactions(): Promise<number> {
-    const pending = await this.prisma.transaction.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.transaction.findMany({
+      where: await this.pendingWhere('transaction'),
       include: { items: true },
       take: 100,
     });
@@ -767,7 +844,7 @@ export class SyncService implements OnModuleInit {
     }));
 
     return this.syncEntity('transactions', mapped, 'transaction', (id) =>
-      this.prisma.transaction.update({
+      this.syncPrisma.transaction.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -780,14 +857,14 @@ export class SyncService implements OnModuleInit {
     // Sans tri, Prisma renvoie un ordre non-déterministe → les mêmes items échouent
     // indéfiniment et bloquent les plus récents (gifts, etc.).
     // Augmenter à 200 pour vider la file plus vite.
-    const pending = await this.prisma.stockMovement.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.stockMovement.findMany({
+      where: await this.pendingWhere('stock_movement'),
       orderBy: { createdAt: 'asc' },
       take: 200,
     });
 
     return this.syncEntity('stock-movements', pending, 'stock_movement', (id) =>
-      this.prisma.stockMovement.update({
+      this.syncPrisma.stockMovement.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -796,13 +873,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync shifts vers cloud
   private async syncShifts(): Promise<number> {
-    const pending = await this.prisma.shift.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.shift.findMany({
+      where: await this.pendingWhere('shift'),
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('shifts', pending, 'shift', (id) =>
-      this.prisma.shift.update({
+      this.syncPrisma.shift.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -811,14 +888,14 @@ export class SyncService implements OnModuleInit {
 
   // Sync factures vers cloud
   private async syncInvoices(): Promise<number> {
-    const pending = await this.prisma.invoice.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.invoice.findMany({
+      where: await this.pendingWhere('invoice'),
       include: { items: true, payments: true },
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('invoices', pending, 'invoice', (id) =>
-      this.prisma.invoice.update({
+      this.syncPrisma.invoice.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -827,14 +904,14 @@ export class SyncService implements OnModuleInit {
 
   // Sync retours vers cloud
   private async syncReturns(): Promise<number> {
-    const pending = await this.prisma.productReturn.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.productReturn.findMany({
+      where: await this.pendingWhere('return'),
       include: { items: true },
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('returns', pending, 'return', (id) =>
-      this.prisma.productReturn.update({
+      this.syncPrisma.productReturn.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -843,13 +920,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync clients vers cloud
   private async syncCustomers(): Promise<number> {
-    const pending = await this.prisma.customer.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.customer.findMany({
+      where: await this.pendingWhere('customer'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('customers', pending, 'customer', (id) =>
-      this.prisma.customer.update({
+      this.syncPrisma.customer.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -858,13 +935,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync dépenses vers cloud
   private async syncExpenses(): Promise<number> {
-    const pending = await this.prisma.expense.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.expense.findMany({
+      where: await this.pendingWhere('expense'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('expenses', pending, 'expense', (id) =>
-      this.prisma.expense.update({
+      this.syncPrisma.expense.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -873,13 +950,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync recettes vers cloud
   private async syncRevenues(): Promise<number> {
-    const pending = await this.prisma.revenue.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.revenue.findMany({
+      where: await this.pendingWhere('revenue'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('revenues', pending, 'revenue', (id) =>
-      this.prisma.revenue.update({
+      this.syncPrisma.revenue.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -888,13 +965,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync fournisseurs vers cloud
   private async syncSuppliers(): Promise<number> {
-    const pending = await this.prisma.supplier.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.supplier.findMany({
+      where: await this.pendingWhere('supplier'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('suppliers', pending, 'supplier', (id) =>
-      this.prisma.supplier.update({
+      this.syncPrisma.supplier.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -903,14 +980,14 @@ export class SyncService implements OnModuleInit {
 
   // Sync commandes d'achat vers cloud
   private async syncPurchaseOrders(): Promise<number> {
-    const pending = await this.prisma.purchaseOrder.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.purchaseOrder.findMany({
+      where: await this.pendingWhere('purchase_order'),
       include: { items: true },
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('purchase-orders', pending, 'purchase_order', (id) =>
-      this.prisma.purchaseOrder.update({
+      this.syncPrisma.purchaseOrder.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -919,13 +996,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync plannings vers cloud
   private async syncSchedules(): Promise<number> {
-    const pending = await this.prisma.schedule.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.schedule.findMany({
+      where: await this.pendingWhere('schedule'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('schedules', pending, 'schedule', (id) =>
-      this.prisma.schedule.update({
+      this.syncPrisma.schedule.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -934,13 +1011,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync historique fidélité vers cloud
   private async syncLoyaltyHistory(): Promise<number> {
-    const pending = await this.prisma.loyaltyHistory.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.loyaltyHistory.findMany({
+      where: await this.pendingWhere('loyalty_history'),
       take: 100,
     }).catch(() => []);
 
     return this.syncEntity('loyalty-history', pending, 'loyalty_history', (id) =>
-      this.prisma.loyaltyHistory.update({
+      this.syncPrisma.loyaltyHistory.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -949,13 +1026,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync stores vers cloud
   private async syncStores(): Promise<number> {
-    const pending = await this.prisma.store.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.store.findMany({
+      where: await this.pendingWhere('store'),
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('stores', pending, 'store', (id) =>
-      this.prisma.store.update({
+      this.syncPrisma.store.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -964,13 +1041,13 @@ export class SyncService implements OnModuleInit {
 
   // Sync lots de produits vers cloud
   private async syncProductBatches(): Promise<number> {
-    const pending = await this.prisma.productBatch.findMany({
-      where: { syncStatus: 'pending' },
+    const pending = await this.syncPrisma.productBatch.findMany({
+      where: await this.pendingWhere('product_batch'),
       take: 50,
     }).catch(() => []);
 
     return this.syncEntity('product-batches', pending, 'product_batch', (id) =>
-      this.prisma.productBatch.update({
+      this.syncPrisma.productBatch.update({
         where: { id },
         data: { syncStatus: 'synced', syncedAt: new Date() },
       }),
@@ -986,24 +1063,24 @@ export class SyncService implements OnModuleInit {
       pendingSuppliers, pendingPurchaseOrders, pendingSchedules,
       pendingLoyalty, pendingStores, pendingBatches, failedLogs
     ] = await Promise.all([
-      this.prisma.product.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.employee.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.cashRegister.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.transaction.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.stockMovement.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.shift.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.invoice.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.productReturn.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.customer.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.expense.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.revenue.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.supplier.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.purchaseOrder.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.schedule.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.loyaltyHistory.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.store.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.productBatch.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
-      this.prisma.syncLog.count({ where: { status: 'failed' } }).catch(() => 0),
+      this.syncPrisma.product.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.employee.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.cashRegister.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.transaction.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.stockMovement.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.shift.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.invoice.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.productReturn.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.customer.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.expense.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.revenue.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.supplier.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.purchaseOrder.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.schedule.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.loyaltyHistory.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.store.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.productBatch.count({ where: { syncStatus: 'pending' } }).catch(() => 0),
+      this.syncPrisma.syncLog.count({ where: { status: 'failed' } }).catch(() => 0),
     ]);
 
     const total = pendingProducts + pendingEmployees + pendingCashRegisters +
