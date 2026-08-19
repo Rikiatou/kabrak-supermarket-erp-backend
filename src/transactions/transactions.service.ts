@@ -10,11 +10,11 @@ export class TransactionsService {
   // Créer une vente (OFFLINE-FIRST)
   // Enregistrement local immédiat + sync plus tard
   async create(createTransactionDto: CreateTransactionDto) {
-    // FIX: Déduplication — si une transaction identique (même caissier, même total,
-    // même méthode de paiement) a été créée dans les 2 dernières minutes, on la retourne
-    // au lieu d'en créer une nouvelle. Cela évite les doublons quand le réseau
-    // revient et que le frontend resoumet une transaction qui avait déjà réussi.
-    const dedupWindow = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes
+    // FIX: Déduplication robuste — vérifie plusieurs critères pour éviter les doublons
+    // quand le réseau revient et que le frontend resoumet une transaction qui avait déjà réussi.
+    // On cherche une transaction identique (même caissier, même total, même méthode, mêmes items)
+    // dans les 30 dernières minutes (au lieu de 2 min avant).
+    const dedupWindow = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes
     const existing = await this.prisma.transaction.findFirst({
       where: {
         cashierId: createTransactionDto.cashierId,
@@ -31,8 +31,18 @@ export class TransactionsService {
     }).catch(() => null);
 
     if (existing) {
-      // Vérifier que les items correspondent aussi (même nombre d'articles)
-      if (existing.items.length === createTransactionDto.items.length) {
+      // Vérifier que les items correspondent exactement (même produits + mêmes quantités)
+      const itemsMatch =
+        existing.items.length === createTransactionDto.items.length &&
+        existing.items.every((item, i) => {
+          const dtoItem = createTransactionDto.items[i];
+          return (
+            item.productId === dtoItem.productId &&
+            item.quantity === dtoItem.quantity &&
+            item.total === dtoItem.total
+          );
+        });
+      if (itemsMatch) {
         console.log(`⚠️ Transaction dupliquée évitée — retour de ${existing.transactionNumber}`);
         return existing;
       }
