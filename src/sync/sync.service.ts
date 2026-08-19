@@ -560,6 +560,11 @@ export class SyncService implements OnModuleInit {
     return { syncStatus: 'pending', id: { notIn: blocked } };
   }
 
+  // FIX: Timeout par appel HTTP (10s) — évite qu'un appel lent bloque 30s+
+  // FIX: Parallélisation par batches de 5 — 14 items passent de 250s à ~30s
+  private static readonly SYNC_FETCH_TIMEOUT = 10000; // 10s max par appel
+  private static readonly SYNC_BATCH_SIZE = 5; // 5 items en parallèle
+
   private async syncEntity(
     endpoint: string,
     pending: any[],
@@ -569,49 +574,71 @@ export class SyncService implements OnModuleInit {
     if (pending.length === 0) return 0;
 
     let synced = 0;
-    for (const item of pending) {
-      try {
-        const response = await fetch(`${this.cloudApiUrl}/cloud-sync/${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.cloudApiKey,
-          },
-          body: JSON.stringify(item),
-        });
+    // Traiter par batches de SYNC_BATCH_SIZE items en parallèle
+    for (let i = 0; i < pending.length; i += SyncService.SYNC_BATCH_SIZE) {
+      const batch = pending.slice(i, i + SyncService.SYNC_BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((item) => this.syncOneItem(endpoint, item, entityType, markSynced)),
+      );
+      synced += results.filter((r) => r).length;
+    }
+    return synced;
+  }
 
-        if (response.ok) {
-          await markSynced(item.id);
-          synced++;
-        } else {
-          const errText = await response.text().catch(() => '');
-          await this.syncPrisma.syncLog.create({
-            data: {
-              entityType,
-              entityId: item.id,
-              action: 'upsert',
-              status: 'failed',
-              error: `HTTP ${response.status}: ${errText.slice(0, 200)}`,
-              attempts: 1,
-              lastAttempt: new Date(),
-            },
-          }).catch(() => {});
-        }
-      } catch (e: any) {
+  private async syncOneItem(
+    endpoint: string,
+    item: any,
+    entityType: string,
+    markSynced: (id: string) => Promise<any>,
+  ): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), SyncService.SYNC_FETCH_TIMEOUT);
+
+      const response = await fetch(`${this.cloudApiUrl}/cloud-sync/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.cloudApiKey,
+        },
+        body: JSON.stringify(item),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        await markSynced(item.id);
+        return true;
+      } else {
+        const errText = await response.text().catch(() => '');
         await this.syncPrisma.syncLog.create({
           data: {
             entityType,
             entityId: item.id,
             action: 'upsert',
             status: 'failed',
-            error: e.message,
+            error: `HTTP ${response.status}: ${errText.slice(0, 200)}`,
             attempts: 1,
             lastAttempt: new Date(),
           },
         }).catch(() => {});
+        return false;
       }
+    } catch (e: any) {
+      await this.syncPrisma.syncLog.create({
+        data: {
+          entityType,
+          entityId: item.id,
+          action: 'upsert',
+          status: 'failed',
+          error: e.name === 'AbortError' ? `Timeout (${SyncService.SYNC_FETCH_TIMEOUT / 1000}s)` : e.message,
+          attempts: 1,
+          lastAttempt: new Date(),
+        },
+      }).catch(() => {});
+      return false;
     }
-    return synced;
   }
 
   // Synchroniser tout
@@ -760,11 +787,16 @@ export class SyncService implements OnModuleInit {
       } else {
         // Only fetch employees + registers (small payloads, no products)
         // Use productsLimit=0 to skip the products table entirely
+        // FIX: Timeout 15s — évite de bloquer 60s si Railway est lent
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
         const empRes = await fetch(`${this.cloudApiUrl}/cloud-sync/pull?since=1970-01-01T00:00:00.000Z`
           + `&productsLimit=0`
           + (this.syncTenantId ? `&tenantId=${encodeURIComponent(this.syncTenantId)}` : ''), {
           headers: { 'x-api-key': this.cloudApiKey },
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
         if (empRes.ok) {
           data = await empRes.json();
           this.cloudDataCache = data;

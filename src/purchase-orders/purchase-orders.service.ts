@@ -120,8 +120,8 @@ export class PurchaseOrdersService {
     }, 0);
     const orderNumber = `BC-${year}-${String(maxSeq + 1).padStart(4, '0')}`;
 
-    // Étape 1: Créer les nouveaux produits s'il y en a
-    const resolvedItems: Array<{ productId: string; quantity: number; unitCost: number }> = [];
+    // Étape 1: Créer les nouveaux produits s'il y en a (avant la transaction)
+    const resolvedItems: Array<{ productId: string; quantity: number; unitCost: number; sellPrice?: number; expiryDate?: string }> = [];
     for (const item of dto.items) {
       if (item.isNewProduct && item.newProductName) {
         try {
@@ -149,6 +149,8 @@ export class PurchaseOrdersService {
             productId: newProduct.id,
             quantity: item.quantity,
             unitCost: item.unitCost,
+            sellPrice: item.sellPrice,
+            expiryDate: item.expiryDate,
           });
         } catch (e) {
           console.error(`Failed to create new product ${item.newProductName}:`, e);
@@ -159,6 +161,8 @@ export class PurchaseOrdersService {
           productId: item.productId,
           quantity: item.quantity,
           unitCost: item.unitCost,
+          sellPrice: item.sellPrice,
+          expiryDate: item.expiryDate,
         });
       }
     }
@@ -170,67 +174,69 @@ export class PurchaseOrdersService {
 
     const notes = [dto.notes, invoiceNumber ? `Facture fournisseur: ${invoiceNumber}` : null].filter(Boolean).join(' | ');
 
-    // Étape 2: Créer la commande avec les items résolus
-    const order = await this.prisma.purchaseOrder.create({
-      data: {
-        orderNumber,
-        supplierId: dto.supplierId,
-        expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : new Date(),
-        notes,
-        total,
-        status: 'received',
-        receivedDate: new Date(),
-        createdBy: dto.createdBy || createdBy || null,
-        items: {
-          create: resolvedItems.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitCost: item.unitCost,
-            total: item.quantity * item.unitCost,
-            receivedQuantity: item.quantity,
-          })),
+    // FIX: Transaction DB avec timeout généreux (60s) pour atomicité.
+    // Avant: chaque product.update + stockMovement.create était séparé (20+ requêtes
+    // séquentielles sans transaction). Si le pool était saturé, ça timeout.
+    // Maintenant: tout est atomique, et on batch les stockMovements en une requête.
+    return this.prisma.$transaction(async (tx) => {
+      // Étape 2: Créer la commande avec les items résolus
+      const order = await tx.purchaseOrder.create({
+        data: {
+          orderNumber,
+          supplierId: dto.supplierId,
+          expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : new Date(),
+          notes,
+          total,
+          status: 'received',
+          receivedDate: new Date(),
+          createdBy: dto.createdBy || createdBy || null,
+          items: {
+            create: resolvedItems.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitCost: item.unitCost,
+              total: item.quantity * item.unitCost,
+              receivedQuantity: item.quantity,
+            })),
+          },
         },
-      },
-      include: {
-        supplier: true,
-        items: true,
-      },
-    });
+        include: {
+          supplier: true,
+          items: true,
+        },
+      });
 
-    // Étape 3: Mettre à jour le stock pour chaque article
-    for (const item of resolvedItems) {
-      try {
-        await this.prisma.product.update({
+      // Étape 3: Mettre à jour le stock + créer les stock movements en parallèle
+      // (au sein de la transaction, c'est safe — tout est atomique)
+      await Promise.all(resolvedItems.map((item) =>
+        tx.product.update({
           where: { id: item.productId },
           data: {
             stock: { increment: item.quantity },
-            // Mettre à jour le prix de vente et la date d'expiration si fournis
-            ...(dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))?.sellPrice
-              ? { price: dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))!.sellPrice! }
-              : {}),
-            ...(dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))?.expiryDate
-              ? { expiryDate: new Date(dto.items.find((di) => di.productId === item.productId || (di.isNewProduct && di.newProductName))!.expiryDate!) }
-              : {}),
+            ...(item.sellPrice ? { price: item.sellPrice } : {}),
+            ...(item.expiryDate ? { expiryDate: new Date(item.expiryDate) } : {}),
           },
-        });
+        }),
+      ));
 
-        await this.prisma.stockMovement.create({
-          data: {
-            productId: item.productId,
-            type: 'in',
-            quantity: item.quantity,
-            reason: 'purchase',
-            reference: invoiceNumber || order.orderNumber,
-            notes: `Réception achat ${order.orderNumber}${invoiceNumber ? ` — Facture: ${invoiceNumber}` : ''}`,
-            createdBy: createdBy || undefined,
-          },
-        });
-      } catch (e) {
-        console.error(`Stock update failed for product ${item.productId}:`, e);
-      }
-    }
+      // Batch: tous les stockMovements en une seule createMany
+      await tx.stockMovement.createMany({
+        data: resolvedItems.map((item) => ({
+          productId: item.productId,
+          type: 'in',
+          quantity: item.quantity,
+          reason: 'purchase',
+          reference: invoiceNumber || order.orderNumber,
+          notes: `Réception achat ${order.orderNumber}${invoiceNumber ? ` — Facture: ${invoiceNumber}` : ''}`,
+          createdBy: createdBy || null,
+        })),
+      });
 
-    return order;
+      return order;
+    }, {
+      maxWait: 30000,  // 30s max pour obtenir une connexion
+      timeout: 60000,  // 60s pour exécuter la transaction
+    });
   }
 
   // Ajouter des articles à un bordereau DÉJÀ reçu, sans re-réceptionner les
@@ -300,47 +306,61 @@ export class PurchaseOrdersService {
       }
     }
 
+    // FIX: Transaction DB pour atomicité + batch (au lieu de 3N requêtes séquentielles)
     let addedTotal = 0;
     for (const item of resolved) {
       addedTotal += item.quantity * item.unitCost;
-      await this.prisma.purchaseOrderItem.create({
-        data: {
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Batch: tous les items du bordereau en une seule createMany
+      await tx.purchaseOrderItem.createMany({
+        data: resolved.map((item) => ({
           purchaseOrderId: id,
           productId: item.productId,
           quantity: item.quantity,
           unitCost: item.unitCost,
           total: item.quantity * item.unitCost,
           receivedQuantity: item.quantity,
-        },
+        })),
       });
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          stock: { increment: item.quantity },
-          ...(item.sellPrice ? { price: item.sellPrice } : {}),
-          ...(item.expiryDate ? { expiryDate: new Date(item.expiryDate) } : {}),
-        },
-      });
-      await this.prisma.stockMovement.create({
-        data: {
+
+      // Batch: tous les product updates en parallèle
+      await Promise.all(resolved.map((item) =>
+        tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: { increment: item.quantity },
+            ...(item.sellPrice ? { price: item.sellPrice } : {}),
+            ...(item.expiryDate ? { expiryDate: new Date(item.expiryDate) } : {}),
+          },
+        }),
+      ));
+
+      // Batch: tous les stockMovements en une seule createMany
+      await tx.stockMovement.createMany({
+        data: resolved.map((item) => ({
           productId: item.productId,
           type: 'in',
           quantity: item.quantity,
           reason: 'purchase',
           reference: order.orderNumber,
           notes: `Ajout au bordereau ${order.orderNumber}`,
-          createdBy: createdBy || undefined,
+          createdBy: createdBy || null,
+        })),
+      });
+
+      // Mettre à jour le total du bordereau (+ marquer à re-synchroniser)
+      await tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          total: { increment: addedTotal },
+          syncStatus: 'pending',
         },
       });
-    }
-
-    // Mettre à jour le total du bordereau (+ marquer à re-synchroniser)
-    await this.prisma.purchaseOrder.update({
-      where: { id },
-      data: {
-        total: { increment: addedTotal },
-        syncStatus: 'pending',
-      },
+    }, {
+      maxWait: 30000,
+      timeout: 60000,
     });
 
     return this.findOne(id);
@@ -373,50 +393,56 @@ export class PurchaseOrdersService {
     const newCost = data.unitCost != null ? data.unitCost : item.unitCost;
     const delta = newQty - oldQty; // >0 = reçu plus, <0 = reçu moins
 
-    // Ajuster le stock du produit selon le delta
-    if (delta !== 0) {
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: delta }, syncStatus: 'pending' },
-      });
-      await this.prisma.stockMovement.create({
-        data: {
-          productId: item.productId,
-          type: delta > 0 ? 'in' : 'out',
-          quantity: delta,
-          reason: 'purchase',
-          reference: order.orderNumber,
-          notes: `Correction bordereau ${order.orderNumber}: ${oldQty} → ${newQty}`,
-          createdBy: createdBy || undefined,
-        },
-      });
-    }
-
     const oldItemTotal = item.total;
+    const newItemTotal = newQty > 0 ? newQty * newCost : 0;
 
-    if (newQty <= 0) {
-      // Supprimer l'article
-      await this.prisma.purchaseOrderItem.delete({ where: { id: itemId } });
-    } else {
-      await this.prisma.purchaseOrderItem.update({
-        where: { id: itemId },
+    // FIX: Transaction DB pour atomicité
+    await this.prisma.$transaction(async (tx) => {
+      // Ajuster le stock du produit selon le delta
+      if (delta !== 0) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: delta }, syncStatus: 'pending' },
+        });
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: delta > 0 ? 'in' : 'out',
+            quantity: delta,
+            reason: 'purchase',
+            reference: order.orderNumber,
+            notes: `Correction bordereau ${order.orderNumber}: ${oldQty} → ${newQty}`,
+            createdBy: createdBy || null,
+          },
+        });
+      }
+
+      if (newQty <= 0) {
+        // Supprimer l'article
+        await tx.purchaseOrderItem.delete({ where: { id: itemId } });
+      } else {
+        await tx.purchaseOrderItem.update({
+          where: { id: itemId },
+          data: {
+            quantity: newQty,
+            unitCost: newCost,
+            total: newQty * newCost,
+            receivedQuantity: newQty,
+          },
+        });
+      }
+
+      // Recalculer le total du bordereau (garde la date originale intacte)
+      await tx.purchaseOrder.update({
+        where: { id: orderId },
         data: {
-          quantity: newQty,
-          unitCost: newCost,
-          total: newQty * newCost,
-          receivedQuantity: newQty,
+          total: { increment: newItemTotal - oldItemTotal },
+          syncStatus: 'pending',
         },
       });
-    }
-
-    // Recalculer le total du bordereau (garde la date originale intacte)
-    const newItemTotal = newQty > 0 ? newQty * newCost : 0;
-    await this.prisma.purchaseOrder.update({
-      where: { id: orderId },
-      data: {
-        total: { increment: newItemTotal - oldItemTotal },
-        syncStatus: 'pending',
-      },
+    }, {
+      maxWait: 30000,
+      timeout: 60000,
     });
 
     return this.findOne(orderId);
@@ -433,42 +459,45 @@ export class PurchaseOrdersService {
         throw new NotFoundException(`Purchase order #${id} not found`);
       }
 
-      // Increment stock for each item + create stock movements (sequential)
-      for (const item of order.items) {
-        try {
-          await this.prisma.product.update({
+      // FIX: Transaction DB + batch (au lieu de 2N requêtes séquentielles)
+      return this.prisma.$transaction(async (tx) => {
+        // Batch: tous les product updates en parallèle
+        await Promise.all(order.items.map((item) =>
+          tx.product.update({
             where: { id: item.productId },
             data: {
               stock: { increment: item.quantity },
             },
-          });
+          }),
+        ));
 
-          await this.prisma.stockMovement.create({
-            data: {
-              productId: item.productId,
-              type: 'in',
-              quantity: item.quantity,
-              reason: 'purchase',
-              reference: order.orderNumber,
-              notes: `Réception commande ${order.orderNumber}`,
-              createdBy: createdBy || undefined,
-            },
-          });
-        } catch (e) {
-          console.error(`Stock update failed for product ${item.productId}:`, e);
-        }
-      }
+        // Batch: tous les stockMovements en une seule createMany
+        await tx.stockMovement.createMany({
+          data: order.items.map((item) => ({
+            productId: item.productId,
+            type: 'in',
+            quantity: item.quantity,
+            reason: 'purchase',
+            reference: order.orderNumber,
+            notes: `Réception commande ${order.orderNumber}`,
+            createdBy: createdBy || null,
+          })),
+        });
 
-      return this.prisma.purchaseOrder.update({
-        where: { id },
-        data: {
-          status,
-          receivedDate: new Date(),
-        },
-        include: {
-          supplier: true,
-          items: true,
-        },
+        return tx.purchaseOrder.update({
+          where: { id },
+          data: {
+            status,
+            receivedDate: new Date(),
+          },
+          include: {
+            supplier: true,
+            items: true,
+          },
+        });
+      }, {
+        maxWait: 30000,
+        timeout: 60000,
       });
     }
 
