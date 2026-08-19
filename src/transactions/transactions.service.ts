@@ -87,6 +87,9 @@ export class TransactionsService {
           tenantId: tenantId || null,
           status: 'completed',
           syncStatus: 'pending', // À synchroniser avec le cloud
+          // FIX: Si une date est fournie (resoumission pending), l'utiliser
+          // pour préserver l'ordre chronologique des ventes
+          ...(createTransactionDto.date ? { date: new Date(createTransactionDto.date) } : {}),
           items: {
             create: createTransactionDto.items.map((item) => ({
               productId: item.productId,

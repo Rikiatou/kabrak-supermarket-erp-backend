@@ -72,6 +72,10 @@ export class CreateTransactionDto {
   @IsOptional()
   customerId?: string;
 
+  @IsString()
+  @IsOptional()
+  date?: string; // Date originale pour les resoumissions pending (sinon now())
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateTransactionItemDto)
