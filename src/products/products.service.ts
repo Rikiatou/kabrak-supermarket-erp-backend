@@ -144,10 +144,10 @@ export class ProductsService {
     const skip = (page - 1) * limit;
 
     // Recherche par barcode exact (scan caisse)
+    // PERF: Pas de include supplier — inutile à la caisse
     if (barcode) {
       const product = await this.prisma.product.findFirst({
         where: { barcode },
-        include: { supplier: true },
       });
       return {
         data: product ? [product] : [],
@@ -159,7 +159,6 @@ export class ProductsService {
     if (sku) {
       const product = await this.prisma.product.findFirst({
         where: { sku },
-        include: { supplier: true },
       });
       return {
         data: product ? [product] : [],
@@ -199,7 +198,6 @@ export class ProductsService {
         where,
         skip,
         take: limit,
-        include: { supplier: true },
         orderBy: { name: 'asc' },
       }),
       this.prisma.product.count({ where }),
@@ -237,18 +235,17 @@ export class ProductsService {
   }
 
   // Trouver par barcode (pour caisse) — cherche aussi par packBarcode
+  // PERF: Pas de include supplier — le caissier n'en a pas besoin pour vendre
   async findByBarcode(barcode: string) {
     // D'abord chercher par barcode unité
     let product = await this.prisma.product.findFirst({
       where: { barcode },
-      include: { supplier: true },
     });
 
     // Si pas trouvé, chercher par packBarcode
     if (!product) {
       product = await this.prisma.product.findFirst({
         where: { packBarcode: barcode },
-        include: { supplier: true },
       });
     }
 
