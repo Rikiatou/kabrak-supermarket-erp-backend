@@ -44,9 +44,10 @@ export class SyncService implements OnModuleInit {
 
   async onModuleInit() {
     if (this.syncEnabled) {
-      // Vérifier connexion toutes les 5 minutes
+      // Vérifier connexion toutes les 2 heures (le cloud est un backup, pas temps réel)
+      // FIX: Était 5 min — pompait la DB en plein service et causait des lenteurs
       const interval = parseInt(
-        this.configService.get<string>('SYNC_INTERVAL', '300000'),
+        this.configService.get<string>('SYNC_INTERVAL', '7200000'),
       );
       this.syncInterval = setInterval(() => {
         this.checkAndSync();
