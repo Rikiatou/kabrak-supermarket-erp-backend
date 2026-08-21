@@ -32,10 +32,16 @@ export class TransactionsService {
 
     if (existing) {
       // Vérifier que les items correspondent exactement (même produits + mêmes quantités)
+      // FIX: Trier les deux listes par productId avant de comparer —
+      // la DB ne garantit pas l'ordre des items, et le frontend peut envoyer dans un ordre différent.
+      // Sans tri, itemsMatch=false même si c'est la même vente → doublon créé.
+      const sortKey = (a: { productId: string }) => a.productId;
+      const sortedExisting = [...existing.items].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+      const sortedDto = [...createTransactionDto.items].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
       const itemsMatch =
-        existing.items.length === createTransactionDto.items.length &&
-        existing.items.every((item, i) => {
-          const dtoItem = createTransactionDto.items[i];
+        sortedExisting.length === sortedDto.length &&
+        sortedExisting.every((item, i) => {
+          const dtoItem = sortedDto[i];
           return (
             item.productId === dtoItem.productId &&
             item.quantity === dtoItem.quantity &&
