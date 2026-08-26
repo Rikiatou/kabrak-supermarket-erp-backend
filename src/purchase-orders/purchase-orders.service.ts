@@ -121,13 +121,17 @@ export class PurchaseOrdersService {
     const orderNumber = `BC-${year}-${String(maxSeq + 1).padStart(4, '0')}`;
 
     // Étape 1: Créer les nouveaux produits s'il y en a (avant la transaction)
+    // PERF: Compter les produits UNE SEULE FOIS avant la boucle (pas à chaque item).
+    // Avant: product.count() dans la boucle = N comptages de 18000 produits → timeout.
+    const hasNewProducts = dto.items.some((it) => it.isNewProduct && it.newProductName);
+    let prodCount = hasNewProducts ? await this.prisma.product.count() : 0;
     const resolvedItems: Array<{ productId: string; quantity: number; unitCost: number; sellPrice?: number; expiryDate?: string }> = [];
     for (const item of dto.items) {
       if (item.isNewProduct && item.newProductName) {
         try {
           // Générer SKU et barcode auto si non fournis
-          const prodCount = await this.prisma.product.count();
-          const autoSku = item.newProductBarcode || `PRD-${String(prodCount + 1).padStart(5, '0')}`;
+          prodCount++;
+          const autoSku = item.newProductBarcode || `PRD-${String(prodCount).padStart(5, '0')}`;
           const newProduct = await this.prisma.product.create({
             data: {
               sku: autoSku,
@@ -266,11 +270,14 @@ export class PurchaseOrdersService {
       sellPrice?: number;
       expiryDate?: string;
     }> = [];
+    // PERF: Compter les produits UNE SEULE FOIS avant la boucle (pas à chaque item)
+    const hasNewItems = items.some((it) => it.isNewProduct && it.newProductName);
+    let prodCount = hasNewItems ? await this.prisma.product.count() : 0;
     for (const item of items) {
       if (item.isNewProduct && item.newProductName) {
-        const prodCount = await this.prisma.product.count();
+        prodCount++;
         const autoSku =
-          item.newProductBarcode || `PRD-${String(prodCount + 1).padStart(5, '0')}`;
+          item.newProductBarcode || `PRD-${String(prodCount).padStart(5, '0')}`;
         const newProduct = await this.prisma.product.create({
           data: {
             sku: autoSku,
