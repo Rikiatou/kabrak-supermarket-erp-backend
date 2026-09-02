@@ -53,6 +53,14 @@ export class SyncService implements OnModuleInit {
         this.checkAndSync();
       }, interval);
 
+      // Sync unique ~30s après le démarrage: vide le backlog accumulé pendant
+      // que le backend/cloud était down, sans attendre le prochain cycle (jusqu'à 2h).
+      // Le délai de 30s évite de ralentir le boot et laisse la DB se stabiliser.
+      setTimeout(() => {
+        console.log('🚀 Sync initiale au démarrage (rattrapage du backlog)...');
+        this.checkAndSync();
+      }, 30000);
+
       console.log(`🔄 Sync activé - intervalle: ${interval / 1000}s`);
       console.log(`☁️  Cloud API: ${this.cloudApiUrl || 'non configuré'}`);
     } else {
