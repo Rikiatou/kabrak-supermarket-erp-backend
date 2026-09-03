@@ -207,25 +207,36 @@ export class ShiftsService {
       _sum: { totalRefunded: true },
     });
 
-    // Cash refunds — remboursements/échanges payés en espèces (sortent du tiroir).
-    // Soustraits du cash affiché dans les receipts pour refléter le cash réel.
-    const cashReturnsAgg = await this.prisma.productReturn.aggregate({
+    // Remboursements par méthode de paiement — chaque return doit être déduit
+    // de la méthode par laquelle il a été remboursé (cash, mobile, orange, card),
+    // pas seulement du cash. Sinon un return via Orange reste compté dans Orange
+    // et Total Receipts devient > Net Sales.
+    const returnsByMethodAgg = await this.prisma.productReturn.groupBy({
+      by: ['refundMethod'],
       where: {
         createdBy: shift.employeeId,
         returnDate: { gte: startTime, lte: endTime },
         status: 'completed',
-        refundMethod: 'cash',
       },
       _sum: { totalRefunded: true },
     });
-    const cashReturns = cashReturnsAgg._sum.totalRefunded || 0;
+    const returnsByMethod: Record<string, number> = { cash: 0, card: 0, mobile: 0, orange: 0 };
+    for (const r of returnsByMethodAgg) {
+      const m = r.refundMethod || '';
+      // Les returns sans méthode (avoir/échange) ne sortent d'aucune caisse de paiement.
+      if (m in returnsByMethod) returnsByMethod[m] += r._sum.totalRefunded || 0;
+    }
+    const cashReturns = returnsByMethod.cash;
 
-    // Net cash receipts = cash sales - cash refunds
-    cashReceipts = cashReceipts - cashReturns;
+    // Net receipts par méthode = ventes de la méthode - remboursements de la méthode
+    cashReceipts = cashReceipts - returnsByMethod.cash;
+    cardReceipts = cardReceipts - returnsByMethod.card;
+    mobileReceipts = mobileReceipts - returnsByMethod.mobile;
+    orangeReceipts = orangeReceipts - returnsByMethod.orange;
 
     const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
 
-    // Total receipts = somme des ventes par méthode (cash déjà net des remboursements)
+    // Total receipts = somme des ventes par méthode (chaque méthode déjà nette de ses remboursements)
     const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts;
 
     // Cash drawer = opening cash + cash physically received - change given - cash refunds
