@@ -171,10 +171,18 @@ export class ShiftsService {
         if (t.splitBreakdown) {
           try {
             const bd = JSON.parse(t.splitBreakdown);
-            if (bd.cash) { splitCash += bd.cash; cashReceipts += bd.cash; }
-            if (bd.card) { splitCard += bd.card; cardReceipts += bd.card; }
-            if (bd.mobile) { splitMobile += bd.mobile; mobileReceipts += bd.mobile; }
-            if (bd.orange) { splitOrange += bd.orange; orangeReceipts += bd.orange; }
+            const card = bd.card || 0;
+            const mobile = bd.mobile || 0;
+            const orange = bd.orange || 0;
+            // Les portions électroniques (carte/mobile/orange) sont des montants exacts.
+            // La part cash est DÉDUITE (total - électronique) pour que la somme des
+            // méthodes = total de la vente. Sinon un cash sur-saisi (monnaie rendue non
+            // enregistrée) gonfle les receipts et rend Total Receipts > Net Sales.
+            const cash = Math.max(0, t.total - card - mobile - orange);
+            splitCash += cash; cashReceipts += cash;
+            splitCard += card; cardReceipts += card;
+            splitMobile += mobile; mobileReceipts += mobile;
+            splitOrange += orange; orangeReceipts += orange;
           } catch {}
         }
       }
