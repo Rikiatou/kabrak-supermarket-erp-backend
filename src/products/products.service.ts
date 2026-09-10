@@ -236,16 +236,18 @@ export class ProductsService {
 
   // Trouver par barcode (pour caisse) — cherche aussi par packBarcode
   // PERF: Pas de include supplier — le caissier n'en a pas besoin pour vendre
+  // isActive: true — cohérence avec la recherche stocks: un produit désactivé
+  // ne doit pas être vendable à la caisse ni introuvable dans les stocks.
   async findByBarcode(barcode: string) {
-    // D'abord chercher par barcode unité
+    // D'abord chercher par barcode unité (produits actifs uniquement)
     let product = await this.prisma.product.findFirst({
-      where: { barcode },
+      where: { barcode, isActive: true },
     });
 
-    // Si pas trouvé, chercher par packBarcode
+    // Si pas trouvé, chercher par packBarcode (produits actifs uniquement)
     if (!product) {
       product = await this.prisma.product.findFirst({
-        where: { packBarcode: barcode },
+        where: { packBarcode: barcode, isActive: true },
       });
     }
 
