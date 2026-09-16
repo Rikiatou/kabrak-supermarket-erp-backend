@@ -62,14 +62,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     const limit = process.env.MAIN_DB_POOL || '25';
     const timeout = process.env.MAIN_DB_POOL_TIMEOUT || '20';
+    // connect_timeout: Prisma default = 5s. Sur un mini-serveur Windows, un
+    // gel disque/antivirus de quelques secondes suffit à produire
+    // "Can't reach database server" alors que Postgres est sain. 30s tolère
+    // ces micro-stalls au lieu de faire échouer la vente.
+    const connectTimeout = process.env.MAIN_DB_CONNECT_TIMEOUT || '30';
     try {
       const url = new URL(base);
       url.searchParams.set('connection_limit', limit);
       url.searchParams.set('pool_timeout', timeout);
+      url.searchParams.set('connect_timeout', connectTimeout);
       return url.toString();
     } catch {
       const sep = base.includes('?') ? '&' : '?';
-      return `${base}${sep}connection_limit=${limit}&pool_timeout=${timeout}`;
+      return `${base}${sep}connection_limit=${limit}&pool_timeout=${timeout}&connect_timeout=${connectTimeout}`;
     }
   }
 
