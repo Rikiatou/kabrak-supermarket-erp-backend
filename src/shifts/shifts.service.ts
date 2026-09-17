@@ -8,6 +8,15 @@ export class ShiftsService {
   constructor(private prisma: PrismaService) {}
 
   async openShift(dto: OpenShiftDto) {
+    const alreadyOpen = await this.prisma.shift.findFirst({
+      where: { registerId: dto.registerId, status: 'open' },
+      orderBy: { openedAt: 'desc' },
+    });
+    if (alreadyOpen) {
+      throw new BadRequestException(
+        `La caisse ${dto.registerName || dto.registerId} a déjà un shift ouvert (par ${alreadyOpen.employeeName || 'un caissier'} depuis ${alreadyOpen.openedAt.toISOString()}). Clôturez-le d'abord.`,
+      );
+    }
     return this.prisma.shift.create({
       data: {
         registerId: dto.registerId,
