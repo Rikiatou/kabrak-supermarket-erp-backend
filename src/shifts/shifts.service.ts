@@ -204,7 +204,9 @@ export class ShiftsService {
       + splitCash; // inclure le cash des splits
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
 
-    // Returns & credits — from refunded transactions
+    // Returns & credits — from refunded transactions (informatif uniquement : ces
+    // transactions sont déjà EXCLUES de `transactions` (status completed), donc ni
+    // dans netSales ni dans receipts — les re-soustraire les déduirait deux fois).
     const refundedTx = await this.prisma.transaction.aggregate({
       where: {
         registerId: shift.registerId,
@@ -213,36 +215,10 @@ export class ShiftsService {
       },
       _sum: { total: true },
     });
+    const refundedTransactions = refundedTx._sum.total || 0;
 
-    // Returns from ProductReturn table (processed via Returns page)
-    const productReturns = await this.prisma.productReturn.aggregate({
-      where: {
-        createdBy: shift.employeeId,
-        returnDate: { gte: startTime, lte: endTime },
-        status: 'completed',
-      },
-      _sum: { totalRefunded: true },
-    });
-
-    // Remboursements par méthode de paiement — chaque return doit être déduit
-    // de la méthode par laquelle il a été remboursé (cash, mobile, orange, card),
-    // pas seulement du cash. Sinon un return via Orange reste compté dans Orange
-    // et Total Receipts devient > Net Sales.
-    const returnsByMethodAgg = await this.prisma.productReturn.groupBy({
-      by: ['refundMethod'],
-      where: {
-        createdBy: shift.employeeId,
-        returnDate: { gte: startTime, lte: endTime },
-        status: 'completed',
-      },
-      _sum: { totalRefunded: true },
-    });
-    const returnsByMethod: Record<string, number> = { cash: 0, card: 0, mobile: 0, orange: 0 };
-    for (const r of returnsByMethodAgg) {
-      const m = r.refundMethod || '';
-      // Les returns sans méthode (avoir/échange) ne sortent d'aucune caisse de paiement.
-      if (m in returnsByMethod) returnsByMethod[m] += r._sum.totalRefunded || 0;
-    }
+    const { returnsByMethod, nonCashReturns, returnsAndCredits } =
+      await this.computeReturns(shift.employeeId, startTime, endTime);
     const cashReturns = returnsByMethod.cash;
 
     // Net receipts par méthode = ventes de la méthode - remboursements de la méthode
@@ -251,9 +227,8 @@ export class ShiftsService {
     mobileReceipts = mobileReceipts - returnsByMethod.mobile;
     orangeReceipts = orangeReceipts - returnsByMethod.orange;
 
-    const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
-
     // Total receipts = somme des ventes par méthode (chaque méthode déjà nette de ses remboursements)
+    // Invariant : totalReceipts = netSales + nonCashReturns (échanges/avoirs sans sortie d'argent)
     const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts;
 
     // Cash drawer = opening cash + cash physically received - change given - cash refunds
@@ -317,6 +292,8 @@ export class ShiftsService {
       grossSales: grossSalesTotal,
       returnsAndCredits,
       cashReturns,
+      nonCashReturns,
+      refundedTransactions,
       totalDiscount: totalDiscountAll,
       totalTax,
       netSales: adjustedNetSales,
@@ -390,6 +367,34 @@ export class ShiftsService {
     }
 
     return Array.from(productMap.values()).sort((a, b) => b.total - a.total);
+  }
+
+  // Retours (ProductReturn) d'un caissier sur une période, ventilés par méthode de remboursement.
+  // - returnsByMethod : remboursés en argent (cash/card/mobile/orange) → déduits du CA ET de la méthode
+  // - nonCashReturns  : échange / avoir (refundMethod null) → déduits du CA mais aucune sortie d'argent,
+  //                     donc Total Receipts = Net Sales + nonCashReturns (écart légitime, affiché)
+  // - returnsAndCredits : total des retours (réduit le CA)
+  private async computeReturns(employeeId: string, start: Date, end: Date) {
+    const agg = await this.prisma.productReturn.groupBy({
+      by: ['refundMethod'],
+      where: {
+        createdBy: employeeId,
+        returnDate: { gte: start, lte: end },
+        status: 'completed',
+      },
+      _sum: { totalRefunded: true },
+    });
+    const returnsByMethod: Record<string, number> = { cash: 0, card: 0, mobile: 0, orange: 0 };
+    let nonCashReturns = 0;
+    for (const r of agg) {
+      const m = r.refundMethod || '';
+      const amount = r._sum.totalRefunded || 0;
+      if (m in returnsByMethod) returnsByMethod[m] += amount;
+      else nonCashReturns += amount;
+    }
+    const returnsAndCredits =
+      returnsByMethod.cash + returnsByMethod.card + returnsByMethod.mobile + returnsByMethod.orange + nonCashReturns;
+    return { returnsByMethod, nonCashReturns, returnsAndCredits };
   }
 
   // Construire la liste des factures à crédit (impayées ou partiellement payées)
@@ -498,10 +503,14 @@ export class ShiftsService {
         if (t.splitBreakdown) {
           try {
             const bd = JSON.parse(t.splitBreakdown);
-            if (bd.cash) { splitCash += bd.cash; cashReceipts += bd.cash; }
-            if (bd.card) { cardReceipts += bd.card; }
-            if (bd.mobile) { mobileReceipts += bd.mobile; }
-            if (bd.orange) { orangeReceipts += bd.orange; }
+            const card = bd.card || 0;
+            const mobile = bd.mobile || 0;
+            const orange = bd.orange || 0;
+            const cash = Math.max(0, t.total - card - mobile - orange);
+            splitCash += cash; cashReceipts += cash;
+            cardReceipts += card;
+            mobileReceipts += mobile;
+            orangeReceipts += orange;
           } catch {}
         }
       }
@@ -513,7 +522,7 @@ export class ShiftsService {
       + splitCash;
     const changeGiven = transactions.reduce((s, t) => s + (t.change || 0), 0);
 
-    // Returns — from refunded transactions
+    // Returns — refunded transactions (informatif : déjà exclues de `transactions`)
     const refundedTx = await this.prisma.transaction.aggregate({
       where: {
         cashierId: employeeId,
@@ -522,35 +531,19 @@ export class ShiftsService {
       },
       _sum: { total: true },
     });
+    const refundedTransactions = refundedTx._sum.total || 0;
 
-    // Returns from ProductReturn table (processed via Returns page)
-    const productReturns = await this.prisma.productReturn.aggregate({
-      where: {
-        createdBy: employeeId,
-        returnDate: { gte: dayStart, lte: dayEnd },
-        status: 'completed',
-      },
-      _sum: { totalRefunded: true },
-    });
+    const { returnsByMethod, nonCashReturns, returnsAndCredits } =
+      await this.computeReturns(employeeId, dayStart, dayEnd);
+    const cashReturns = returnsByMethod.cash;
 
-    // Cash refunds — remboursements/échanges payés en espèces (sortent du tiroir).
-    const cashReturnsAgg = await this.prisma.productReturn.aggregate({
-      where: {
-        createdBy: employeeId,
-        returnDate: { gte: dayStart, lte: dayEnd },
-        status: 'completed',
-        refundMethod: 'cash',
-      },
-      _sum: { totalRefunded: true },
-    });
-    const cashReturns = cashReturnsAgg._sum.totalRefunded || 0;
+    // Net receipts par méthode = ventes de la méthode - remboursements de la méthode
+    cashReceipts = cashReceipts - returnsByMethod.cash;
+    cardReceipts = cardReceipts - returnsByMethod.card;
+    mobileReceipts = mobileReceipts - returnsByMethod.mobile;
+    orangeReceipts = orangeReceipts - returnsByMethod.orange;
 
-    // Net cash receipts = cash sales - cash refunds
-    cashReceipts = cashReceipts - cashReturns;
-
-    const returnsAndCredits = (refundedTx._sum.total || 0) + (productReturns._sum.totalRefunded || 0);
-
-    // Total receipts = somme des ventes par méthode (cash déjà net des remboursements)
+    // Total receipts = netSales + nonCashReturns
     const totalReceipts = cashReceipts + cardReceipts + mobileReceipts + orangeReceipts;
 
     // Invoice payments collected by this cashier during the day
@@ -623,6 +616,8 @@ export class ShiftsService {
       grossSales: grossSalesTotal,
       returnsAndCredits,
       cashReturns,
+      nonCashReturns,
+      refundedTransactions,
       totalDiscount: totalDiscountAll,
       totalTax,
       netSales: adjustedNetSales,
