@@ -84,6 +84,30 @@ export class ReturnsService {
           })
           .catch(() => {});
       }
+
+      // Échange : le produit emporté par le client sort du stock (sinon il reste
+      // compté en rayon alors qu'il est parti — stock fantôme à chaque échange).
+      if (dto.resolution === 'exchange' && item.exchangeProductId) {
+        await this.prisma.product
+          .update({
+            where: { id: item.exchangeProductId },
+            data: { stock: { decrement: item.quantity } },
+          })
+          .catch(() => {});
+
+        await this.prisma.stockMovement
+          .create({
+            data: {
+              productId: item.exchangeProductId,
+              type: 'out',
+              quantity: item.quantity,
+              reason: 'exchange',
+              reference: ret.id,
+              notes: `Échange client — remplace ${item.productName}`,
+            },
+          })
+          .catch(() => {});
+      }
     }
 
     return ret;
