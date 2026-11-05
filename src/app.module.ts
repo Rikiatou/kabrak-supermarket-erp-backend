@@ -27,6 +27,7 @@ import { ReturnsModule } from './returns/returns.module';
 import { BatchesModule } from './batches/batches.module';
 import { CloudSyncModule } from './cloud-sync/cloud-sync.module';
 import { TenantModule } from './tenant/tenant.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { TenantModule } from './tenant/tenant.module';
     DatabaseModule,
     AuthModule,
     LicensesModule,
+    AdminModule,
     ProductsModule,
     TransactionsModule,
     StockModule,

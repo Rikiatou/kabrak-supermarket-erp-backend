@@ -350,6 +350,25 @@ export class LicensesService {
   // ========================================
   // SUSPENDRE / RÉACTIVER / ANNULER
   // ========================================
+  // Set an exact expiry date (shorten or lengthen). Reactivates an EXPIRED licence if the date is in the future.
+  async setExpiry(licenseKey: string, date: string) {
+    const expiresAt = new Date(date);
+    if (Number.isNaN(expiresAt.getTime())) throw new BadRequestException('Date invalide');
+    expiresAt.setHours(23, 59, 59, 999);
+    const license = await this.prisma.license.findUnique({ where: { licenseKey } });
+    if (!license) throw new NotFoundException('Licence introuvable');
+    const future = expiresAt > new Date();
+    const updated = await this.prisma.license.update({
+      where: { id: license.id },
+      data: {
+        expiresAt,
+        ...(license.status === 'EXPIRED' && future ? { status: 'ACTIVE' } : {}),
+        ...(license.status === 'ACTIVE' && !future ? { status: 'EXPIRED' } : {}),
+      },
+    });
+    return { licenseKey: updated.licenseKey, expiresAt: updated.expiresAt, status: updated.status };
+  }
+
   async suspend(licenseKey: string) {
     return this.updateStatus(licenseKey, 'SUSPENDED');
   }

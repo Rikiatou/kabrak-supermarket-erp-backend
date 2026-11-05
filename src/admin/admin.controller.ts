@@ -15,6 +15,11 @@ import { LicensesService } from '../licenses/licenses.service';
 import { GenerateLicenseDto } from '../licenses/dto/generate-license.dto';
 import { RenewLicenseDto } from '../licenses/dto/renew-license.dto';
 import { ConfigService } from '@nestjs/config';
+import { createHash, timingSafeEqual } from 'crypto';
+
+const safeEqual = (a: unknown, b: string): boolean =>
+  typeof a === 'string' &&
+  timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
 
 @Controller('admin/erp')
 export class AdminController {
@@ -25,7 +30,7 @@ export class AdminController {
 
   private checkAdminToken(token: string) {
     const adminToken = this.configService.get<string>('ADMIN_TOKEN');
-    if (!adminToken || token !== adminToken) {
+    if (!adminToken || !safeEqual(token, adminToken)) {
       throw new UnauthorizedException('Token admin invalide');
     }
   }
@@ -40,10 +45,10 @@ export class AdminController {
     @Body() body: { password: string },
   ) {
     const adminToken = this.configService.get<string>('ADMIN_TOKEN');
-    if (!adminToken || body.password !== adminToken) {
+    if (!adminToken || !safeEqual(body?.password, adminToken)) {
       throw new UnauthorizedException('Mot de passe incorrect');
     }
-    return { success: true, token: adminToken };
+    return { success: true };
   }
 
   // ========================================
@@ -139,6 +144,27 @@ export class AdminController {
   // ========================================
   // LICENCES - SUSPENDRE
   // ========================================
+
+  // ========================================
+  // LICENCES - DATE D'EXPIRATION EXACTE
+  // ========================================
+
+  @Public()
+  @Patch('licenses/:licenseKey/expires')
+  async setExpiry(
+    @Headers('x-admin-token') token: string,
+    @Param('licenseKey') licenseKey: string,
+    @Body() body: { expiresAt: string },
+  ) {
+    this.checkAdminToken(token);
+    if (!body?.expiresAt) throw new BadRequestException('Date requise');
+    const result = await this.licensesService.setExpiry(licenseKey, body.expiresAt);
+    return {
+      success: true,
+      message: `Expiration fixée au ${new Date(result.expiresAt).toLocaleDateString('fr-FR')}`,
+      data: result,
+    };
+  }
 
   @Public()
   @Patch('licenses/:licenseKey/suspend')
