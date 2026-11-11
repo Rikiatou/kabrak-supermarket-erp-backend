@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { PrismaClient } from '@prisma/client';
 
@@ -60,7 +61,9 @@ async function bootstrap() {
     await autoMigrateTenantId();
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // 100 kb par défaut : trop peu pour une grosse transaction ou facture envoyée par le mini-PC
+  app.useBodyParser('json', { limit: '10mb' });
 
   // CORS dynamique: accepter les origins configurés + tous les sous-domaines vercel.app
   const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3001')
