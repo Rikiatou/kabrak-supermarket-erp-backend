@@ -13,6 +13,10 @@ export class SyncService implements OnModuleInit {
   private syncInterval: any;
   // FIX: Guard concurrence — empêche 2 cycles de sync de tourner en même temps
   private isSyncing: boolean = false;
+  private syncStartedAt: number = 0;
+  // Un cycle ne devrait jamais dépasser ~10 min (2h d'intervalle + petits batches).
+  // Au-delà de 30 min, on considère le cycle bloqué et on le débloque.
+  private static readonly SYNC_STUCK_TIMEOUT = 30 * 60 * 1000;
 
   // Cache: maps local employeeId → cloud employeeId (by employeeNumber)
   private employeeIdMap: Map<string, string> = new Map();
@@ -72,8 +76,16 @@ export class SyncService implements OnModuleInit {
   async checkAndSync() {
     // FIX: Empêcher deux cycles de sync simultanés (contention DB/réseau)
     if (this.isSyncing) {
-      console.log('⏳ Sync déjà en cours, cycle ignoré');
-      return;
+      // Watchdog: si le cycle précédent est bloqué depuis trop longtemps
+      // (fetch sans timeout sur le corps de la réponse, page infinie, etc.),
+      // on le libère au lieu de rester coincé pour toujours.
+      if (Date.now() - this.syncStartedAt > SyncService.SYNC_STUCK_TIMEOUT) {
+        console.error('⚠️ Cycle de sync bloqué depuis plus de 30 min — déblocage forcé');
+        this.isSyncing = false;
+      } else {
+        console.log('⏳ Sync déjà en cours, cycle ignoré');
+        return;
+      }
     }
 
     const wasOnline = this.isOnline;
@@ -85,7 +97,8 @@ export class SyncService implements OnModuleInit {
 
     if (this.isOnline && this.syncEnabled) {
       this.isSyncing = true;
-      const startTime = Date.now();
+      this.syncStartedAt = Date.now();
+      const startTime = this.syncStartedAt;
       try {
         // Push local → cloud
         await this.syncAll();
@@ -95,6 +108,7 @@ export class SyncService implements OnModuleInit {
         await this.purgeSyncLog();
       } finally {
         this.isSyncing = false;
+        this.syncStartedAt = 0;
         const duration = Date.now() - startTime;
         if (duration > 10000) {
           console.warn(`⚠️ Sync a duré ${Math.round(duration / 1000)}s — surveiller les performances`);
@@ -148,14 +162,19 @@ export class SyncService implements OnModuleInit {
           signal: controller.signal,
         });
 
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          console.log('⬇️ Pull: cloud returned', response.status);
-          return;
+        // Le timeout reste actif pendant la lecture du corps (response.json()).
+        // Sinon un corps de réponse tronqué peut bloquer le cycle pour toujours.
+        let data: any;
+        try {
+          if (!response.ok) {
+            clearTimeout(timeout);
+            console.log('⬇️ Pull: cloud returned', response.status);
+            return;
+          }
+          data = await response.json();
+        } finally {
+          clearTimeout(timeout);
         }
-
-        const data = await response.json();
 
         if (productsTotal === null && data.productsTotal != null) {
           productsTotal = data.productsTotal;
@@ -805,11 +824,14 @@ export class SyncService implements OnModuleInit {
           headers: { 'x-api-key': this.cloudApiKey },
           signal: controller.signal,
         });
-        clearTimeout(timeout);
-        if (empRes.ok) {
-          data = await empRes.json();
-          this.cloudDataCache = data;
-          this.cloudDataCacheAt = now;
+        try {
+          if (empRes.ok) {
+            data = await empRes.json();
+            this.cloudDataCache = data;
+            this.cloudDataCacheAt = now;
+          }
+        } finally {
+          clearTimeout(timeout);
         }
       }
 
