@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 
 // Placeholder name for stub suppliers/products created when FK entity
@@ -37,42 +37,46 @@ export class CloudSyncService {
           stubData.lastName = '';
           stubData.role = 'cashier';
           stubData.department = '';
+          stubData.phone = '';
           stubData.hireDate = new Date();
           stubData.status = 'active';
           stubData.pin = '0000';
           break;
         case 'product':
-          stubData.sku = `STUB-${id.slice(-8)}`;
+          stubData.sku = `STUB-${id}`;
+          stubData.barcode = `STUB-${id}`;
           stubData.name = STUB_NAME;
+          stubData.category = STUB_NAME;
           stubData.price = 0;
+          stubData.costPrice = 0;
           stubData.stock = 0;
           stubData.unit = 'unité';
           break;
         case 'cashRegister':
           stubData.name = '(en attente)';
-          stubData.code = `STUB-${id.slice(-8)}`;
+          stubData.code = `STUB-${id}`;
           stubData.status = 'closed';
           break;
         case 'customer':
-          stubData.customerNumber = `STUB-${id.slice(-8)}`;
+          stubData.customerNumber = `STUB-${id}`;
           stubData.firstName = '(en attente)';
           stubData.lastName = '';
-          stubData.phone = '';
+          stubData.phone = `STUB-${id}`;
           break;
         case 'invoice':
-          stubData.number = `STUB-${id.slice(-8)}`;
+          stubData.number = `STUB-${id}`;
+          stubData.clientName = '(en attente)';
+          stubData.clientPhone = '';
           stubData.date = new Date();
+          stubData.subtotal = 0;
+          stubData.tax = 0;
           stubData.total = 0;
           stubData.status = 'draft';
           break;
         case 'transaction':
-          stubData.transactionNumber = `STUB-${id.slice(-8)}`;
-          stubData.date = new Date();
-          stubData.total = 0;
-          stubData.paymentMethod = 'cash';
-          stubData.status = 'completed';
-          stubData.cashierId = 'STUB-NONEXISTENT'; // will be set by real sync
-          break;
+          // Une transaction exige un caissier existant : pas de stub possible.
+          // L'élément sera renvoyé après la vraie transaction.
+          return;
       }
 
       await (this.prisma as any)[model].create({ data: stubData });
@@ -80,7 +84,7 @@ export class CloudSyncService {
     } catch (e: any) {
       // Si le stub ne peut pas être créé (ex: contrainte unique), on ignore
       // le PO/tx sera re-syncé au prochain cycle
-      console.log(`⚠️ Stub ${model} ${id} échec: ${e.message?.slice(0, 100)}`);
+      console.log(`⚠️ Stub ${model} ${id} échec: ${e.message?.split('\n').filter((l: string) => l.trim()).pop()?.slice(0, 200)}`);
     }
   }
 
@@ -109,25 +113,50 @@ export class CloudSyncService {
       syncStatus: 'synced', syncedAt: new Date(),
     };
 
-    // sku est unique PAR tenant (pas globalement) → lookup scopé par tenant
-    const existing = await this.prisma.product.findFirst({
-      where: { sku, tenantId: tenantId || null },
-      select: { id: true },
-    });
+    // 1) même id (déjà synchronisé ou stub FK) → mise à jour, même si le SKU a changé
+    // 2) sinon même SKU dans le même magasin → mise à jour
+    // 3) sinon création
+    const existing =
+      (await this.prisma.product.findUnique({ where: { id }, select: { id: true, tenantId: true } })) ??
+      (await this.prisma.product.findFirst({ where: { sku, tenantId: tenantId || null }, select: { id: true, tenantId: true } }));
 
-    if (existing) {
-      return this.prisma.product.update({
-        where: { id: existing.id },
-        data: { ...common, updatedAt: updatedAt ? new Date(updatedAt) : undefined },
+    // Ne jamais effacer le magasin d'un produit cloud si le mini-PC envoie tenantId vide
+    const resolvedTenantId = tenantId || existing?.tenantId || null;
+    const values = { ...common, tenantId: resolvedTenantId };
+
+    try {
+      if (existing) {
+        return await this.prisma.product.update({
+          where: { id: existing.id },
+          data: { ...values, sku, updatedAt: updatedAt ? new Date(updatedAt) : undefined },
+        });
+      }
+      return await this.prisma.product.create({
+        data: {
+          ...values, id, sku,
+          createdAt: createdAt ? new Date(createdAt) : undefined,
+          updatedAt: updatedAt ? new Date(updatedAt) : undefined,
+        },
       });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        const conflict = await this.prisma.product.findFirst({
+          where: {
+            tenantId: resolvedTenantId,
+            id: { not: existing?.id ?? id },
+            OR: [{ sku }, ...(barcode ? [{ barcode }] : [])],
+          },
+          select: { id: true, sku: true, barcode: true, name: true },
+        });
+        if (conflict) {
+          const field = conflict.sku === sku ? `SKU "${sku}"` : `code-barres "${barcode}"`;
+          throw new ConflictException(
+            `${field} déjà utilisé au cloud par "${conflict.name}" (id=${conflict.id}, sku=${conflict.sku})`,
+          );
+        }
+      }
+      throw e;
     }
-    return this.prisma.product.create({
-      data: {
-        ...common, id, sku,
-        createdAt: createdAt ? new Date(createdAt) : undefined,
-        updatedAt: updatedAt ? new Date(updatedAt) : undefined,
-      },
-    });
   }
 
   async upsertEmployee(data: any) {
@@ -585,7 +614,9 @@ export class CloudSyncService {
     if (productsLimit !== undefined) {
       productArgs.take = productsLimit;
       productArgs.skip = productsOffset;
-      productArgs.orderBy = { updatedAt: 'asc' };
+      // id en second critère : sans lui, des produits avec le même updatedAt
+      // (import, mise à jour groupée) peuvent sauter ou se répéter d'une page à l'autre
+      productArgs.orderBy = [{ updatedAt: 'asc' }, { id: 'asc' }];
     }
 
     const [
@@ -606,7 +637,7 @@ export class CloudSyncService {
           tenantId: true, createdAt: true, updatedAt: true,
         },
       }).catch(() => []),
-      this.prisma.product.findMany(productArgs).catch(() => []),
+      this.prisma.product.findMany(productArgs).catch((e) => { console.error('pull products failed:', e?.message); throw e; }),
       this.prisma.cashRegister.findMany({
         where: { updatedAt: { gt: since }, ...tenantWhere },
         select: {

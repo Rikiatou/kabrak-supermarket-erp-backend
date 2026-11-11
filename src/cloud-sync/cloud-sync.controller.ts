@@ -7,15 +7,18 @@ import {
   Headers,
   HttpException,
   HttpStatus,
+  UseFilters,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../auth/public.decorator';
 import { CloudSyncService } from './cloud-sync.service';
+import { CloudSyncExceptionFilter } from './cloud-sync-exception.filter';
 
 // Controller exécuté sur le CLOUD pour recevoir les données sync depuis le local
 // Toutes les routes vérifient le x-api-key header (pas JWT)
 @Controller('cloud-sync')
 @Public()
+@UseFilters(CloudSyncExceptionFilter)
 export class CloudSyncController {
   private apiKey: string;
 
