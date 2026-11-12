@@ -102,8 +102,10 @@ export class SyncService implements OnModuleInit {
       try {
         // Push local → cloud
         await this.syncAll();
-        // Pull cloud → local (reverse sync)
-        await this.pullFromCloud();
+        // Pull cloud → local (reverse sync) — désactivable avec SYNC_PULL_ENABLED=false
+        if (this.configService.get<string>('SYNC_PULL_ENABLED', 'true') !== 'false') {
+          await this.pullFromCloud();
+        }
         // Purge old SyncLog entries (keep last 7 days only)
         await this.purgeSyncLog();
       } finally {
