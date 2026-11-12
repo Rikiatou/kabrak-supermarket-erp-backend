@@ -329,6 +329,12 @@ export class SyncService implements OnModuleInit {
     let applied = 0;
     for (const prod of products) {
       try {
+        // Ne jamais appliquer les "stubs" cloud : fiches temporaires créées quand un
+        // mouvement de stock arrive avant son produit. Les appliquer écraserait le
+        // vrai nom/prix local par "Pending sync" / 0.
+        if (prod.name === 'Pending sync' || String(prod.sku || '').startsWith('STUB-')) {
+          continue;
+        }
         const match = existingMap.get(prod.id) || existingMap.get(prod.sku) || (prod.barcode && existingMap.get(prod.barcode));
 
         const common = {
