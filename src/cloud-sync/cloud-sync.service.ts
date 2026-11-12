@@ -21,7 +21,8 @@ export class CloudSyncService {
       const existing = await (this.prisma as any)[model].findUnique({ where: { id }, select: { id: true } });
       if (existing) return;
 
-      const stubData: any = { id };
+      // Date 0 : un stub ne doit jamais paraître « plus récent » que la vraie fiche du mini-PC
+      const stubData: any = { id, createdAt: new Date(0), updatedAt: new Date(0) };
       if (tenantId !== undefined) stubData.tenantId = tenantId || null;
 
       // Champs NOT NULL minimaux par modèle
@@ -39,8 +40,7 @@ export class CloudSyncService {
           stubData.department = '';
           stubData.phone = '';
           stubData.hireDate = new Date();
-          stubData.status = 'active';
-          stubData.pin = '0000';
+          stubData.status = 'inactive';
           break;
         case 'product':
           stubData.sku = `STUB-${id}`;
@@ -597,8 +597,15 @@ export class CloudSyncService {
     // Filtre tenant: si un tenantId est fourni, on ne renvoie QUE ses données
     // (multi-tenant: chaque mini-PC ne doit recevoir que les données de son magasin)
     const tenantWhere = tenantId ? { tenantId } : {};
+    // Les stubs FK (« Pending sync », STUB-…) ne doivent jamais redescendre vers un mini-PC :
+    // ils écraseraient le vrai nom/prix local.
+    const notStub = (field: string) => ({ NOT: { [field]: { startsWith: 'STUB-' } } });
+    const productWhere = {
+      updatedAt: { gt: since }, ...tenantWhere,
+      AND: [notStub('sku'), { NOT: { name: STUB_NAME } }],
+    };
     const productArgs: any = {
-      where: { updatedAt: { gt: since }, ...tenantWhere },
+      where: productWhere,
       select: {
         id: true, sku: true, barcode: true, name: true, description: true,
         category: true, subCategory: true, brand: true,
@@ -629,7 +636,7 @@ export class CloudSyncService {
       productsTotal,
     ] = await Promise.all([
       this.prisma.employee.findMany({
-        where: { updatedAt: { gt: since }, ...tenantWhere },
+        where: { updatedAt: { gt: since }, ...tenantWhere, ...notStub('employeeNumber') },
         select: {
           id: true, employeeNumber: true, firstName: true, lastName: true,
           role: true, department: true, phone: true, email: true,
@@ -639,7 +646,7 @@ export class CloudSyncService {
       }).catch(() => []),
       this.prisma.product.findMany(productArgs).catch((e) => { console.error('pull products failed:', e?.message); throw e; }),
       this.prisma.cashRegister.findMany({
-        where: { updatedAt: { gt: since }, ...tenantWhere },
+        where: { updatedAt: { gt: since }, ...tenantWhere, ...notStub('code') },
         select: {
           id: true, name: true, code: true, status: true,
           openingCash: true, currentCash: true, location: true, isActive: true,
@@ -647,7 +654,7 @@ export class CloudSyncService {
         },
       }).catch(() => []),
       this.prisma.customer.findMany({
-        where: { updatedAt: { gt: since }, ...tenantWhere },
+        where: { updatedAt: { gt: since }, ...tenantWhere, ...notStub('customerNumber') },
         select: {
           id: true, customerNumber: true, firstName: true, lastName: true,
           phone: true, email: true, points: true, totalSpent: true,
@@ -656,7 +663,7 @@ export class CloudSyncService {
         },
       }).catch(() => []),
       this.prisma.supplier.findMany({
-        where: { updatedAt: { gt: since }, ...tenantWhere },
+        where: { updatedAt: { gt: since }, ...tenantWhere, NOT: { name: STUB_NAME } },
         select: {
           id: true, name: true, contact: true, phone: true, email: true,
           address: true, paymentTerms: true, rating: true, isActive: true,
@@ -674,7 +681,7 @@ export class CloudSyncService {
       }).catch(() => []),
       // Only count when paginating (cheap when limit is set); else undefined
       productsLimit !== undefined
-        ? this.prisma.product.count({ where: { updatedAt: { gt: since }, ...tenantWhere } }).catch(() => 0)
+        ? this.prisma.product.count({ where: productWhere }).catch(() => 0)
         : Promise.resolve(undefined),
     ]);
 
