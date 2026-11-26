@@ -947,3 +947,18 @@ model ProductBatch {
 
   @@map("product_batches")
 }
+
+// ========================================
+// RÉGLAGES (clé / valeur, ex: objectif mensuel)
+// ========================================
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String
+  value     String
+  tenantId  String?
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([tenantId])
+  @@map("app_settings")
+}
