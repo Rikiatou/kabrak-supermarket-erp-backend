@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { getCurrentTenantId } from '../tenant/tenant.context';
+
+const MONTHLY_GOAL_KEY = 'monthlyGoal';
 
 @Injectable()
 export class TransactionsService {
@@ -483,42 +486,44 @@ export class TransactionsService {
   }
 
   // Marge par catégorie (pour graphique dashboard)
+  // CA et marge réels des ventes du mois, par catégorie (prix d'achat actuel)
   async getMarginByCategory() {
-    const products = await this.prisma.product.findMany({
-      where: { isActive: true },
-      select: {
-        category: true,
-        price: true,
-        costPrice: true,
-        stock: true,
-      },
-    });
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const tenantId = getCurrentTenantId();
 
-    // Grouper par catégorie
-    const categoryMap = new Map<string, { revenue: number; margin: number; cost: number }>();
+    const rows = await this.prisma.$queryRaw<Array<{ category: string | null; revenue: bigint | number; cost: bigint | number }>>(Prisma.sql`
+      SELECT p.category AS category,
+             COALESCE(SUM(ti.total), 0) AS revenue,
+             COALESCE(SUM(ti.quantity * p."costPrice"), 0) AS cost
+      FROM transaction_items ti
+      JOIN transactions t ON t.id = ti."transactionId"
+      JOIN products p ON p.id = ti."productId"
+      WHERE t.status = 'completed' AND t.date >= ${startOfMonth}
+      ${tenantId ? Prisma.sql`AND t."tenantId" = ${tenantId}` : Prisma.empty}
+      GROUP BY p.category`);
 
-    products.forEach((p) => {
-      const cat = p.category || 'Autres';
-      const data = categoryMap.get(cat) || { revenue: 0, margin: 0, cost: 0 };
-      const potentialRevenue = p.price * p.stock;
-      const potentialCost = (p.costPrice || 0) * p.stock;
-      data.revenue += potentialRevenue;
-      data.cost += potentialCost;
-      data.margin += potentialRevenue - potentialCost;
+    const categoryMap = new Map<string, { revenue: number; cost: number }>();
+    for (const r of rows) {
+      const cat = r.category || 'Autres';
+      const data = categoryMap.get(cat) || { revenue: 0, cost: 0 };
+      data.revenue += Number(r.revenue);
+      data.cost += Number(r.cost);
       categoryMap.set(cat, data);
-    });
+    }
 
-    const result = Array.from(categoryMap.entries())
-      .map(([category, data]) => ({
-        category,
-        revenue: data.revenue,
-        margin: data.margin,
-        marginRate: data.revenue > 0 ? Math.round((data.margin / data.revenue) * 100) : 0,
-      }))
+    return Array.from(categoryMap.entries())
+      .map(([category, data]) => {
+        const margin = data.revenue - data.cost;
+        return {
+          category,
+          revenue: data.revenue,
+          margin,
+          marginRate: data.revenue > 0 ? Math.round((margin / data.revenue) * 100) : 0,
+        };
+      })
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 7);
-
-    return result;
   }
 
   // Annuler/rembourser une transaction
@@ -568,32 +573,49 @@ export class TransactionsService {
     });
   }
 
-  // Objectif mensuel (CA du mois vs objectif)
+  // Objectif mensuel (CA du mois vs objectif réglé par le patron, null = pas encore fixé)
   async getMonthlyGoal() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const result = await this.prisma.transaction.aggregate({
-      where: {
-        date: { gte: startOfMonth, lte: endOfMonth },
-        status: 'completed',
-      },
-      _sum: { total: true },
-      _count: true,
-    });
+    const [result, setting] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          date: { gte: startOfMonth, lte: endOfMonth },
+          status: 'completed',
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      this.prisma.appSetting.findFirst({ where: { key: MONTHLY_GOAL_KEY } }),
+    ]);
 
     const current = result._sum.total || 0;
-    const goal = 500000; // Objectif fixe pour l'instant (TODO: rendre configurable)
-    const progress = goal > 0 ? Math.round((current / goal) * 100) : 0;
+    const parsed = setting ? parseInt(setting.value, 10) : NaN;
+    const goal = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 
     return {
       current,
       goal,
-      progress,
+      progress: goal ? Math.round((current / goal) * 100) : 0,
       transactions: result._count,
-      remaining: Math.max(0, goal - current),
+      remaining: goal ? Math.max(0, goal - current) : 0,
     };
+  }
+
+  async setMonthlyGoal(goal: number) {
+    if (!Number.isFinite(goal) || goal < 0) {
+      throw new BadRequestException('Objectif invalide');
+    }
+    const value = String(Math.round(goal));
+    const existing = await this.prisma.appSetting.findFirst({ where: { key: MONTHLY_GOAL_KEY } });
+    if (existing) {
+      await this.prisma.appSetting.update({ where: { id: existing.id }, data: { value } });
+    } else {
+      await this.prisma.appSetting.create({ data: { key: MONTHLY_GOAL_KEY, value } });
+    }
+    return this.getMonthlyGoal();
   }
 
   // Top produits vendus (ce mois)

@@ -5,6 +5,9 @@ import {
   Body,
   Param,
   Query,
+  Put,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -68,6 +71,15 @@ export class TransactionsController {
   @Get('stats/monthly-goal')
   getMonthlyGoal() {
     return this.transactionsService.getMonthlyGoal();
+  }
+
+  @Put('stats/monthly-goal')
+  setMonthlyGoal(@Body() body: { goal: number }, @Req() req: any) {
+    const role = req.user?.role;
+    if (role && !['boss', 'manager'].includes(role)) {
+      throw new ForbiddenException("Seul le patron peut changer l'objectif");
+    }
+    return this.transactionsService.setMonthlyGoal(Number(body?.goal));
   }
 
   @Get('stats/top-products')

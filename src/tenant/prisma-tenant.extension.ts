@@ -22,6 +22,7 @@ const TENANT_MODELS = [
   'Schedule',
   'ProductReturn',
   'ProductBatch',
+  'AppSetting',
 ];
 
 /**
