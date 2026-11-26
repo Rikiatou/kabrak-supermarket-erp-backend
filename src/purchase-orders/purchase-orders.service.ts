@@ -223,6 +223,11 @@ export class PurchaseOrdersService {
         }),
       ));
 
+      await tx.product.updateMany({
+        where: { id: { in: resolvedItems.map((i) => i.productId) }, supplierId: null },
+        data: { supplierId: dto.supplierId, syncStatus: 'pending' },
+      });
+
       // Batch: tous les stockMovements en une seule createMany
       await tx.stockMovement.createMany({
         data: resolvedItems.map((item) => ({
@@ -477,6 +482,11 @@ export class PurchaseOrdersService {
             },
           }),
         ));
+
+        await tx.product.updateMany({
+          where: { id: { in: order.items.map((i) => i.productId) }, supplierId: null },
+          data: { supplierId: order.supplierId, syncStatus: 'pending' },
+        });
 
         // Batch: tous les stockMovements en une seule createMany
         await tx.stockMovement.createMany({

@@ -55,11 +55,37 @@ async function autoMigrateTenantId() {
   }
 }
 
+// Products received through a supplier delivery before deliveries set product.supplierId
+// had no supplier: give them the supplier of their latest received delivery.
+async function backfillProductSuppliers() {
+  const prisma = new PrismaClient();
+  try {
+    const count = await prisma.$executeRawUnsafe(`
+      UPDATE products p SET "supplierId" = last.sid
+      FROM (
+        SELECT DISTINCT ON (poi."productId") poi."productId" AS pid, po."supplierId" AS sid, po."tenantId" AS tid
+        FROM purchase_order_items poi
+        JOIN purchase_orders po ON po.id = poi."purchaseOrderId"
+        WHERE po.status IN ('received', 'partial')
+        ORDER BY poi."productId", po."receivedDate" DESC NULLS LAST, po."createdAt" DESC
+      ) last
+      WHERE p.id = last.pid AND p."supplierId" IS NULL
+        AND p."tenantId" IS NOT DISTINCT FROM last.tid`);
+    if (count > 0) console.log(`[supplier-backfill] ${count} products linked to their supplier`);
+  } catch (e) {
+    console.error('[supplier-backfill] Error:', e);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 async function bootstrap() {
   // Run tenant migration before app starts (on cloud)
   if (process.env.CLOUD_API_KEY) {
     await autoMigrateTenantId();
   }
+
+  void backfillProductSuppliers();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // 100 kb par défaut : trop peu pour une grosse transaction ou facture envoyée par le mini-PC
