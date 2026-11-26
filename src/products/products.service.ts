@@ -199,6 +199,7 @@ export class ProductsService {
         skip,
         take: limit,
         orderBy: { name: 'asc' },
+        include: { supplier: { select: { id: true, name: true } } },
       }),
       this.prisma.product.count({ where }),
     ]);
