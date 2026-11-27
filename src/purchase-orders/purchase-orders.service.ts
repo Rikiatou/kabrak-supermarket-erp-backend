@@ -25,13 +25,13 @@ export class PurchaseOrdersService {
     const rows = [...byId.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     if (rows.length === 0) return;
     const values = Prisma.join(rows.map(([id, r]) =>
-      Prisma.sql`(${id}, ${Math.round(r.qty)}::int, ${r.price}::int, ${r.exp}::timestamp)`));
+      Prisma.sql`(${id}, ${Math.round(r.qty)}::int, ${r.price}::int, (${r.exp ? r.exp.toISOString() : null}::timestamptz AT TIME ZONE 'UTC'))`));
     await tx.$executeRaw`
       UPDATE products p SET
         stock = p.stock + v.qty,
         price = COALESCE(v.price, p.price),
         "expiryDate" = COALESCE(v.exp, p."expiryDate"),
-        "updatedAt" = ${new Date()}::timestamp
+        "updatedAt" = (${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC')
       FROM (VALUES ${values}) AS v(id, qty, price, exp)
       WHERE p.id = v.id`;
   }
