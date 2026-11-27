@@ -12,12 +12,13 @@ export class PurchaseOrdersService {
   // tills' sales (which update the same rows) waited and failed with "Transaction already closed".
   private async incrementStock(
     tx: Prisma.TransactionClient,
-    items: Array<{ productId: string; quantity: number; sellPrice?: number; expiryDate?: string }>,
+    items: Array<{ productId: string; quantity: number; unitCost?: number; sellPrice?: number; expiryDate?: string }>,
   ) {
-    const byId = new Map<string, { qty: number; price: number | null; exp: Date | null }>();
+    const byId = new Map<string, { qty: number; cost: number | null; price: number | null; exp: Date | null }>();
     for (const it of items) {
-      const cur = byId.get(it.productId) ?? { qty: 0, price: null, exp: null };
+      const cur = byId.get(it.productId) ?? { qty: 0, cost: null, price: null, exp: null };
       cur.qty += it.quantity;
+      if (it.unitCost && it.unitCost > 0) cur.cost = Math.round(it.unitCost);
       if (it.sellPrice) cur.price = Math.round(it.sellPrice);
       if (it.expiryDate) cur.exp = new Date(it.expiryDate);
       byId.set(it.productId, cur);
@@ -25,14 +26,15 @@ export class PurchaseOrdersService {
     const rows = [...byId.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     if (rows.length === 0) return;
     const values = Prisma.join(rows.map(([id, r]) =>
-      Prisma.sql`(${id}, ${Math.round(r.qty)}::int, ${r.price}::int, (${r.exp ? r.exp.toISOString() : null}::timestamptz AT TIME ZONE 'UTC'))`));
+      Prisma.sql`(${id}, ${Math.round(r.qty)}::int, ${r.cost}::int, ${r.price}::int, (${r.exp ? r.exp.toISOString() : null}::timestamptz AT TIME ZONE 'UTC'))`));
     await tx.$executeRaw`
       UPDATE products p SET
         stock = p.stock + v.qty,
+        "costPrice" = COALESCE(v.cost, p."costPrice"),
         price = COALESCE(v.price, p.price),
         "expiryDate" = COALESCE(v.exp, p."expiryDate"),
         "updatedAt" = (${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC')
-      FROM (VALUES ${values}) AS v(id, qty, price, exp)
+      FROM (VALUES ${values}) AS v(id, qty, cost, price, exp)
       WHERE p.id = v.id`;
   }
 
@@ -423,11 +425,18 @@ export class PurchaseOrdersService {
     // FIX: Transaction DB pour atomicité
     await this.prisma.$transaction(async (tx) => {
       // Ajuster le stock du produit selon le delta
-      if (delta !== 0) {
+      const costChanged = data.unitCost != null && data.unitCost > 0 && newQty > 0;
+      if (delta !== 0 || costChanged) {
         await tx.product.update({
           where: { id: item.productId },
-          data: { stock: { increment: delta }, syncStatus: 'pending' },
+          data: {
+            ...(delta !== 0 ? { stock: { increment: delta } } : {}),
+            ...(costChanged ? { costPrice: Math.round(newCost) } : {}),
+            syncStatus: 'pending',
+          },
         });
+      }
+      if (delta !== 0) {
         await tx.stockMovement.create({
           data: {
             productId: item.productId,
