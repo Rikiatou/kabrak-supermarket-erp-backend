@@ -1,10 +1,40 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 
 @Injectable()
 export class PurchaseOrdersService {
   constructor(private prisma: PrismaService) {}
+
+  // One UPDATE for the whole delivery, rows locked in id order. Before: one product.update per
+  // item inside the transaction; a 200-item delivery held product row locks for minutes and the
+  // tills' sales (which update the same rows) waited and failed with "Transaction already closed".
+  private async incrementStock(
+    tx: Prisma.TransactionClient,
+    items: Array<{ productId: string; quantity: number; sellPrice?: number; expiryDate?: string }>,
+  ) {
+    const byId = new Map<string, { qty: number; price: number | null; exp: Date | null }>();
+    for (const it of items) {
+      const cur = byId.get(it.productId) ?? { qty: 0, price: null, exp: null };
+      cur.qty += it.quantity;
+      if (it.sellPrice) cur.price = Math.round(it.sellPrice);
+      if (it.expiryDate) cur.exp = new Date(it.expiryDate);
+      byId.set(it.productId, cur);
+    }
+    const rows = [...byId.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    if (rows.length === 0) return;
+    const values = Prisma.join(rows.map(([id, r]) =>
+      Prisma.sql`(${id}, ${Math.round(r.qty)}::int, ${r.price}::int, (${r.exp ? r.exp.toISOString() : null}::timestamptz AT TIME ZONE 'UTC'))`));
+    await tx.$executeRaw`
+      UPDATE products p SET
+        stock = p.stock + v.qty,
+        price = COALESCE(v.price, p.price),
+        "expiryDate" = COALESCE(v.exp, p."expiryDate"),
+        "updatedAt" = (${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC')
+      FROM (VALUES ${values}) AS v(id, qty, price, exp)
+      WHERE p.id = v.id`;
+  }
 
   async findAll(page: number = 1, limit: number = 20, status?: string) {
     const skip = (page - 1) * limit;
@@ -212,16 +242,7 @@ export class PurchaseOrdersService {
 
       // Étape 3: Mettre à jour le stock + créer les stock movements en parallèle
       // (au sein de la transaction, c'est safe — tout est atomique)
-      await Promise.all(resolvedItems.map((item) =>
-        tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { increment: item.quantity },
-            ...(item.sellPrice ? { price: item.sellPrice } : {}),
-            ...(item.expiryDate ? { expiryDate: new Date(item.expiryDate) } : {}),
-          },
-        }),
-      ));
+      await this.incrementStock(tx, resolvedItems);
 
       await tx.product.updateMany({
         where: { id: { in: resolvedItems.map((i) => i.productId) }, supplierId: null },
@@ -338,16 +359,7 @@ export class PurchaseOrdersService {
       });
 
       // Batch: tous les product updates en parallèle
-      await Promise.all(resolved.map((item) =>
-        tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { increment: item.quantity },
-            ...(item.sellPrice ? { price: item.sellPrice } : {}),
-            ...(item.expiryDate ? { expiryDate: new Date(item.expiryDate) } : {}),
-          },
-        }),
-      ));
+      await this.incrementStock(tx, resolved);
 
       // Batch: tous les stockMovements en une seule createMany
       await tx.stockMovement.createMany({
@@ -474,14 +486,7 @@ export class PurchaseOrdersService {
       // FIX: Transaction DB + batch (au lieu de 2N requêtes séquentielles)
       return this.prisma.$transaction(async (tx) => {
         // Batch: tous les product updates en parallèle
-        await Promise.all(order.items.map((item) =>
-          tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: item.quantity },
-            },
-          }),
-        ));
+        await this.incrementStock(tx, order.items);
 
         await tx.product.updateMany({
           where: { id: { in: order.items.map((i) => i.productId) }, supplierId: null },
